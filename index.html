@@ -16,16 +16,22 @@
         text-shadow: 0 0 15px #00eaff;
         margin-bottom: 20px;
     }
-    #prompt {
-        width: 80%;
-        padding: 15px;
-        font-size: 1.2rem;
+    #prompt, #length {
+        padding: 12px;
+        font-size: 1.1rem;
         border-radius: 10px;
         border: 2px solid #00eaff;
         background: #0a0a0a;
         color: #00eaff;
         outline: none;
         box-shadow: 0 0 10px #00eaff;
+        margin: 5px;
+    }
+    #prompt {
+        width: 60%;
+    }
+    #length {
+        width: 120px;
     }
     button {
         background: #00eaff;
@@ -53,7 +59,8 @@
 
 <h1>Maximus V2</h1>
 
-<input id="prompt" placeholder="Describe your track... (e.g. 'dnb with trap beat, dark pads')" />
+<input id="prompt" placeholder="Describe your track... (e.g. 'dnb with trap beat, dark pads, vocals')" />
+<input id="length" type="number" min="10" max="600" placeholder="Length (sec)" />
 
 <br>
 
@@ -104,7 +111,7 @@ function drawWaveform() {
 
 drawWaveform();
 
-function parseStyle(promptText) {
+function parseStyle(promptText, lengthOverride) {
     promptText = promptText.toLowerCase();
     let style = {
         bpm: 120,
@@ -115,6 +122,7 @@ function parseStyle(promptText) {
         hiphop: false,
         dark: promptText.includes("dark"),
         bright: promptText.includes("bright"),
+        vocals: (promptText.includes("vocal") || promptText.includes("rap") || promptText.includes("singer")),
         lengthSeconds: 60
     };
 
@@ -147,11 +155,15 @@ function parseStyle(promptText) {
     if (promptText.includes("long")) style.lengthSeconds = 120;
     if (promptText.includes("full song") || promptText.includes("full track")) style.lengthSeconds = 180;
 
+    if (!isNaN(lengthOverride) && lengthOverride > 5 && lengthOverride <= 600) {
+        style.lengthSeconds = lengthOverride;
+    }
+
     return style;
 }
 
-function generateSong(promptText) {
-    const style = parseStyle(promptText);
+function generateSong(promptText, lengthOverride) {
+    const style = parseStyle(promptText, lengthOverride);
     const sampleRate = audioCtx.sampleRate;
     const duration = style.lengthSeconds;
     const frameCount = sampleRate * duration;
@@ -173,6 +185,7 @@ function generateSong(promptText) {
         let drums = 0;
         let bass = 0;
         let synth = 0;
+        let vocalLayer = 0;
 
         // DRUMS
         let kick = 0;
@@ -259,7 +272,17 @@ function generateSong(promptText) {
         synth = (Math.sin(2 * Math.PI * synthFreq * t) +
                  0.5 * Math.sin(2 * Math.PI * (synthFreq * 2) * t)) * synthAmp;
 
-        let sample = drums + bass + synth;
+        // VOCAL-LIKE LAYER (simple vowel-ish lead when vocals requested)
+        if (style.vocals && (section === 1 || section === 2)) {
+            let phrasePos = (t % (barLength * 2)) / (barLength * 2); // 2-bar phrase
+            let vowelFreq = 300 + 200 * Math.sin(phrasePos * Math.PI * 2);
+            let formant1 = Math.sin(2 * Math.PI * vowelFreq * t);
+            let formant2 = Math.sin(2 * Math.PI * (vowelFreq * 2.5) * t);
+            let env = Math.max(0, Math.sin(Math.PI * phrasePos));
+            vocalLayer = (formant1 * 0.4 + formant2 * 0.2) * env * 0.4;
+        }
+
+        let sample = drums + bass + synth + vocalLayer;
         sample *= 0.6;
 
         data[i] = sample;
@@ -317,7 +340,8 @@ function exportWAV(buffer, callback) {
 
 document.getElementById("generateBtn").onclick = () => {
     let promptText = document.getElementById("prompt").value || "";
-    generateSong(promptText);
+    let lengthVal = parseFloat(document.getElementById("length").value);
+    generateSong(promptText, lengthVal);
 };
 
 document.getElementById("downloadBtn").onclick = () => {
