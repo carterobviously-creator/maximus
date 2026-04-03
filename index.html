@@ -83,7 +83,8 @@ const ctx = canvas.getContext("2d");
 function drawWaveform() {
     requestAnimationFrame(drawWaveform);
 
-    let data = new Uint8Array(analyser.fftSize);
+    let data = new Uint8Array(analyser.fftSize || 2048);
+    analyser.fftSize = 2048;
     analyser.getByteTimeDomainData(data);
 
     ctx.fillStyle = "#111";
@@ -111,53 +112,109 @@ function drawWaveform() {
 
 drawWaveform();
 
+/* SMARTER MUSIC BRAIN */
 function parseStyle(promptText, lengthOverride) {
-    promptText = promptText.toLowerCase();
-    let style = {
+    const text = (promptText || "").toLowerCase();
+
+    const style = {
+        genres: [],
+        mood: "neutral",
+        energy: "medium",
+        instruments: [],
+        vocals: false,
+        structure: [],
         bpm: 120,
-        trap: false,
-        dnb: false,
-        edm: false,
-        ambient: false,
-        hiphop: false,
-        dark: promptText.includes("dark"),
-        bright: promptText.includes("bright"),
-        vocals: (promptText.includes("vocal") || promptText.includes("rap") || promptText.includes("singer")),
         lengthSeconds: 60
     };
 
-    if (promptText.includes("dnb") || promptText.includes("drum and bass")) {
-        style.dnb = true;
-        style.bpm = 170;
+    // GENRES (supports blends)
+    const genreMap = {
+        "trap": "trap",
+        "dnb": "drum and bass",
+        "drum and bass": "drum and bass",
+        "edm": "edm",
+        "house": "house",
+        "ambient": "ambient",
+        "chill": "ambient",
+        "hip hop": "hip hop",
+        "boom bap": "boom bap",
+        "synthwave": "synthwave",
+        "lofi": "lofi",
+        "dubstep": "dubstep",
+        "drill": "drill"
+    };
+    for (const key in genreMap) {
+        if (text.includes(key)) style.genres.push(genreMap[key]);
     }
-    if (promptText.includes("trap")) {
-        style.trap = true;
-        style.bpm = style.dnb ? 160 : 140;
-    }
-    if (promptText.includes("edm") || promptText.includes("house")) {
-        style.edm = true;
-        style.bpm = 128;
-    }
-    if (promptText.includes("ambient") || promptText.includes("chill")) {
-        style.ambient = true;
-        style.bpm = 80;
-    }
-    if (promptText.includes("hip hop") || promptText.includes("boom bap")) {
-        style.hiphop = true;
-        style.bpm = 90;
+    if (style.genres.length === 0) style.genres.push("generic");
+
+    // MOOD
+    if (text.includes("dark")) style.mood = "dark";
+    if (text.includes("bright")) style.mood = "bright";
+    if (text.includes("sad")) style.mood = "sad";
+    if (text.includes("happy")) style.mood = "happy";
+    if (text.includes("cinematic")) style.mood = "cinematic";
+    if (text.includes("dreamy")) style.mood = "dreamy";
+
+    // ENERGY
+    if (text.includes("high energy") || text.includes("hype") || text.includes("fast")) style.energy = "high";
+    if (text.includes("low energy") || text.includes("chill") || text.includes("slow")) style.energy = "low";
+
+    // INSTRUMENTS
+    const instrumentKeywords = [
+        "deep bass", "bass", "808", "reese", "sub",
+        "pads", "pad", "lead", "melody", "synth", "bells", "piano", "keys", "atmospheric"
+    ];
+    instrumentKeywords.forEach(inst => {
+        if (text.includes(inst)) style.instruments.push(inst);
+    });
+
+    // VOCALS
+    if (text.includes("vocal") || text.includes("rap") || text.includes("singer") || text.includes("space for vocals"))
+        style.vocals = true;
+
+    // STRUCTURE
+    const structureKeywords = ["intro", "build", "drop", "verse", "chorus", "hook", "outro", "bridge"];
+    structureKeywords.forEach(part => {
+        if (text.includes(part)) style.structure.push(part);
+    });
+    if (style.structure.length === 0) {
+        style.structure = ["intro", "build", "drop", "verse", "chorus", "outro"];
     }
 
-    if (!style.trap && !style.dnb && !style.edm && !style.ambient && !style.hiphop) {
-        style.bpm = 120;
+    // BPM from genres (blend-aware)
+    function pickBpm(genres) {
+        if (genres.includes("drum and bass")) return 170;
+        if (genres.includes("dubstep")) return 140;
+        if (genres.includes("trap") || genres.includes("drill")) return 140;
+        if (genres.includes("edm") || genres.includes("house")) return 128;
+        if (genres.includes("hip hop") || genres.includes("boom bap")) return 90;
+        if (genres.includes("lofi")) return 80;
+        if (genres.includes("ambient")) return 75;
+        return 120;
     }
+    style.bpm = pickBpm(style.genres);
 
-    if (promptText.includes("short")) style.lengthSeconds = 30;
-    if (promptText.includes("long")) style.lengthSeconds = 120;
-    if (promptText.includes("full song") || promptText.includes("full track")) style.lengthSeconds = 180;
+    // ENERGY tweaks BPM slightly
+    if (style.energy === "high") style.bpm += 5;
+    if (style.energy === "low") style.bpm -= 5;
 
-    if (!isNaN(lengthOverride) && lengthOverride > 5 && lengthOverride <= 600) {
+    // LENGTH: explicit override box
+    if (!isNaN(lengthOverride) && lengthOverride > 5 && lengthOverride <= 600)
         style.lengthSeconds = lengthOverride;
+
+    // NATURAL LANGUAGE LENGTH
+    const lengthMatch = text.match(/(\d+)\s*(seconds|second|sec|minutes|minute|min)/);
+    if (lengthMatch) {
+        let num = parseInt(lengthMatch[1]);
+        if (lengthMatch[2].includes("min")) num *= 60;
+        style.lengthSeconds = Math.max(10, Math.min(num, 600));
     }
+
+    // Keywords like "short", "long", "full song"
+    if (text.includes("short")) style.lengthSeconds = 30;
+    if (text.includes("long")) style.lengthSeconds = 120;
+    if (text.includes("full song") || text.includes("full track")) style.lengthSeconds = 180;
 
     return style;
 }
@@ -176,6 +233,9 @@ function generateSong(promptText, lengthOverride) {
     const beatsPerBar = 4;
     const barLength = secondsPerBeat * beatsPerBar;
 
+    // Helper: check if genre is present
+    const hasGenre = g => style.genres.includes(g);
+
     for (let i = 0; i < frameCount; i++) {
         let t = i / sampleRate;
         let beat = t / secondsPerBeat;
@@ -187,103 +247,139 @@ function generateSong(promptText, lengthOverride) {
         let synth = 0;
         let vocalLayer = 0;
 
+        // SECTION from structure (loop through structure array)
+        let sectionIndex = Math.floor(bar / 4) % style.structure.length;
+        let sectionName = style.structure[sectionIndex] || "section";
+
         // DRUMS
         let kick = 0;
         let snare = 0;
         let hat = 0;
 
-        if (style.dnb) {
-            if (Math.abs(beatInBar - 0) < 0.05 || Math.abs(beatInBar - 1.5) < 0.05) {
-                kick = Math.sin(2 * Math.PI * 60 * t) * Math.exp(- (t % secondsPerBeat) * 20);
+        // Base patterns by genre blend
+        if (hasGenre("drum and bass")) {
+            if (Math.abs(beatInBar - 0) < 0.04 || Math.abs(beatInBar - 1.5) < 0.04) {
+                kick = Math.sin(2 * Math.PI * 60 * t) * Math.exp(- (t % secondsPerBeat) * 22);
             }
-            if (Math.abs(beatInBar - 1) < 0.05 || Math.abs(beatInBar - 2.5) < 0.05) {
-                snare = (Math.random() * 2 - 1) * 0.5 * Math.exp(- (t % secondsPerBeat) * 25);
+            if (Math.abs(beatInBar - 1) < 0.04 || Math.abs(beatInBar - 2.5) < 0.04) {
+                snare = (Math.random() * 2 - 1) * 0.5 * Math.exp(- (t % secondsPerBeat) * 26);
             }
             if (Math.floor(beat * 4) % 2 === 0) {
-                hat = (Math.random() * 2 - 1) * 0.15;
+                hat = (Math.random() * 2 - 1) * 0.16;
             }
-        } else if (style.trap) {
+        }
+        if (hasGenre("trap") || hasGenre("drill")) {
             if (Math.abs(beatInBar - 0) < 0.05 || Math.abs(beatInBar - 2) < 0.05) {
-                kick = Math.sin(2 * Math.PI * 50 * t) * Math.exp(- (t % secondsPerBeat) * 15);
+                kick += Math.sin(2 * Math.PI * 50 * t) * Math.exp(- (t % secondsPerBeat) * 18);
             }
             if (Math.abs(beatInBar - 1) < 0.05 || Math.abs(beatInBar - 3) < 0.05) {
-                snare = (Math.random() * 2 - 1) * 0.4 * Math.exp(- (t % secondsPerBeat) * 20);
+                snare += (Math.random() * 2 - 1) * 0.4 * Math.exp(- (t % secondsPerBeat) * 22);
             }
             if (Math.floor(beat * 8) % 2 === 0) {
-                hat = (Math.random() * 2 - 1) * 0.12;
+                hat += (Math.random() * 2 - 1) * 0.12;
             }
-        } else if (style.edm) {
+        }
+        if (hasGenre("edm") || hasGenre("house")) {
             if (Math.abs(beatInBar - 0) < 0.05 || Math.abs(beatInBar - 1) < 0.05 ||
                 Math.abs(beatInBar - 2) < 0.05 || Math.abs(beatInBar - 3) < 0.05) {
-                kick = Math.sin(2 * Math.PI * 60 * t) * Math.exp(- (t % secondsPerBeat) * 18);
+                kick += Math.sin(2 * Math.PI * 60 * t) * Math.exp(- (t % secondsPerBeat) * 18);
             }
             if (Math.abs(beatInBar - 1.5) < 0.05 || Math.abs(beatInBar - 3.5) < 0.05) {
-                snare = (Math.random() * 2 - 1) * 0.35 * Math.exp(- (t % secondsPerBeat) * 20);
+                snare += (Math.random() * 2 - 1) * 0.35 * Math.exp(- (t % secondsPerBeat) * 20);
             }
             if (Math.floor(beat * 4) % 2 === 0) {
-                hat = (Math.random() * 2 - 1) * 0.1;
+                hat += (Math.random() * 2 - 1) * 0.1;
             }
-        } else if (style.ambient) {
+        }
+        if (hasGenre("ambient") || hasGenre("lofi")) {
             if (Math.abs(beatInBar - 0) < 0.05) {
-                kick = Math.sin(2 * Math.PI * 40 * t) * Math.exp(- (t % secondsPerBeat) * 8);
+                kick += Math.sin(2 * Math.PI * 40 * t) * Math.exp(- (t % secondsPerBeat) * 8);
             }
             if (Math.abs(beatInBar - 2) < 0.05) {
-                snare = (Math.random() * 2 - 1) * 0.2 * Math.exp(- (t % secondsPerBeat) * 10);
+                snare += (Math.random() * 2 - 1) * 0.2 * Math.exp(- (t % secondsPerBeat) * 10);
             }
             if (Math.floor(beat * 2) % 2 === 0) {
-                hat = (Math.random() * 2 - 1) * 0.05;
+                hat += (Math.random() * 2 - 1) * 0.05;
             }
-        } else {
+        }
+        if (style.genres.includes("generic")) {
             if (Math.abs(beatInBar - 0) < 0.05 || Math.abs(beatInBar - 2) < 0.05) {
-                kick = Math.sin(2 * Math.PI * 60 * t) * Math.exp(- (t % secondsPerBeat) * 15);
+                kick += Math.sin(2 * Math.PI * 60 * t) * Math.exp(- (t % secondsPerBeat) * 15);
             }
             if (Math.abs(beatInBar - 1) < 0.05 || Math.abs(beatInBar - 3) < 0.05) {
-                snare = (Math.random() * 2 - 1) * 0.3 * Math.exp(- (t % secondsPerBeat) * 18);
+                snare += (Math.random() * 2 - 1) * 0.3 * Math.exp(- (t % secondsPerBeat) * 18);
             }
             if (Math.floor(beat * 4) % 2 === 0) {
-                hat = (Math.random() * 2 - 1) * 0.1;
+                hat += (Math.random() * 2 - 1) * 0.1;
             }
         }
 
-        drums = kick + snare + hat;
+        // Energy-based drum scaling
+        let drumEnergy = 1.0;
+        if (style.energy === "high") drumEnergy = 1.2;
+        if (style.energy === "low") drumEnergy = 0.7;
+        drums = (kick + snare + hat) * drumEnergy;
 
         // BASS
         let baseFreq = 55;
-        if (style.dnb) baseFreq = 80;
-        if (style.trap) baseFreq = 45;
-        if (style.edm) baseFreq = 60;
-        if (style.ambient) baseFreq = 40;
+        if (hasGenre("drum and bass")) baseFreq = 80;
+        if (hasGenre("trap") || hasGenre("drill")) baseFreq = 45;
+        if (hasGenre("edm") || hasGenre("house")) baseFreq = 60;
+        if (hasGenre("ambient") || hasGenre("lofi")) baseFreq = 40;
+        if (style.mood === "dark") baseFreq *= 0.9;
+        if (style.mood === "bright") baseFreq *= 1.05;
 
         let bassEnv = Math.max(0, Math.sin(Math.PI * (beatInBar / beatsPerBar)));
-        bass = Math.sin(2 * Math.PI * baseFreq * t) * bassEnv * 0.4;
+        // Simple "pattern" change by section
+        let bassSectionMul = 1.0;
+        if (sectionName.includes("intro")) bassSectionMul = 0.4;
+        if (sectionName.includes("build")) bassSectionMul = 0.7;
+        if (sectionName.includes("drop") || sectionName.includes("chorus")) bassSectionMul = 1.2;
+        if (sectionName.includes("outro")) bassSectionMul = 0.5;
 
-        // SYNTH
-        let synthFreq = style.bright ? 440 : 220;
-        if (style.dark) synthFreq *= 0.75;
-        if (style.ambient) synthFreq *= 0.5;
+        bass = Math.sin(2 * Math.PI * baseFreq * t) * bassEnv * 0.4 * bassSectionMul;
 
-        let section = Math.floor(bar) % 4; // 0 intro, 1 verse, 2 chorus, 3 bridge
+        // SYNTH / MELODY
+        let synthFreq = 220;
+        if (style.mood === "bright" || style.mood === "cinematic") synthFreq = 440;
+        if (style.mood === "dark") synthFreq = 180;
+        if (hasGenre("synthwave")) synthFreq = 330;
+        if (hasGenre("ambient") || style.mood === "dreamy") synthFreq *= 0.7;
+
         let synthAmp = 0.0;
-        if (section === 0) synthAmp = 0.2;
-        if (section === 1) synthAmp = 0.3;
-        if (section === 2) synthAmp = 0.5;
-        if (section === 3) synthAmp = 0.35;
+        if (sectionName.includes("intro")) synthAmp = 0.2;
+        else if (sectionName.includes("build")) synthAmp = 0.35;
+        else if (sectionName.includes("drop") || sectionName.includes("chorus") || sectionName.includes("hook")) synthAmp = 0.6;
+        else if (sectionName.includes("verse")) synthAmp = 0.4;
+        else if (sectionName.includes("outro")) synthAmp = 0.25;
+        else synthAmp = 0.35;
 
-        synth = (Math.sin(2 * Math.PI * synthFreq * t) +
-                 0.5 * Math.sin(2 * Math.PI * (synthFreq * 2) * t)) * synthAmp;
+        // Slight melodic movement
+        let melodicMod = 1 + 0.1 * Math.sin(2 * Math.PI * (t / (barLength * 4)));
+        let f1 = synthFreq * melodicMod;
+        let f2 = f1 * 2;
+        synth = (Math.sin(2 * Math.PI * f1 * t) +
+                 0.5 * Math.sin(2 * Math.PI * f2 * t)) * synthAmp;
 
-        // VOCAL-LIKE LAYER (simple vowel-ish lead when vocals requested)
-        if (style.vocals && (section === 1 || section === 2)) {
-            let phrasePos = (t % (barLength * 2)) / (barLength * 2); // 2-bar phrase
+        // VOCAL-LIKE LAYER
+        if (style.vocals && (sectionName.includes("verse") || sectionName.includes("chorus") || sectionName.includes("hook"))) {
+            let phrasePos = (t % (barLength * 4)) / (barLength * 4); // 4-bar phrase
             let vowelFreq = 300 + 200 * Math.sin(phrasePos * Math.PI * 2);
             let formant1 = Math.sin(2 * Math.PI * vowelFreq * t);
             let formant2 = Math.sin(2 * Math.PI * (vowelFreq * 2.5) * t);
             let env = Math.max(0, Math.sin(Math.PI * phrasePos));
-            vocalLayer = (formant1 * 0.4 + formant2 * 0.2) * env * 0.4;
+            let vocalGain = (style.mood === "cinematic") ? 0.5 : 0.35;
+            vocalLayer = (formant1 * 0.4 + formant2 * 0.2) * env * vocalGain;
         }
 
+        // MIX
         let sample = drums + bass + synth + vocalLayer;
         sample *= 0.6;
+
+        // Simple master "arc" over the whole track (emotional arc)
+        let globalPos = i / frameCount;
+        let arc = Math.sin(globalPos * Math.PI); // fade in/out
+        sample *= 0.7 + 0.6 * arc;
 
         data[i] = sample;
     }
