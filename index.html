@@ -1,0 +1,200 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Maximus V2</title>
+<style>
+    body {
+        background: #000;
+        color: #00eaff;
+        font-family: Arial, sans-serif;
+        text-align: center;
+        padding: 40px;
+    }
+    h1 {
+        font-size: 3rem;
+        text-shadow: 0 0 15px #00eaff;
+        margin-bottom: 20px;
+    }
+    #prompt {
+        width: 80%;
+        padding: 15px;
+        font-size: 1.2rem;
+        border-radius: 10px;
+        border: 2px solid #00eaff;
+        background: #0a0a0a;
+        color: #00eaff;
+        outline: none;
+        box-shadow: 0 0 10px #00eaff;
+    }
+    button {
+        background: #00eaff;
+        border: none;
+        padding: 15px 30px;
+        margin: 15px;
+        font-size: 1.2rem;
+        cursor: pointer;
+        border-radius: 8px;
+        color: #000;
+        font-weight: bold;
+        box-shadow: 0 0 10px #00eaff;
+    }
+    canvas {
+        width: 100%;
+        height: 200px;
+        background: #111;
+        border: 2px solid #00eaff;
+        margin-top: 20px;
+        border-radius: 10px;
+    }
+</style>
+</head>
+<body>
+
+<h1>Maximus V2</h1>
+
+<input id="prompt" placeholder="Describe your beat... (e.g. 'trap fast hats')" />
+
+<br>
+
+<button id="generateBtn">Generate Beat</button>
+
+<canvas id="waveform"></canvas>
+
+<audio id="player" controls></audio>
+
+<button id="downloadBtn">Download WAV</button>
+
+<script>
+let audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+let analyser = audioCtx.createAnalyser();
+let bufferData = null;
+
+const canvas = document.getElementById("waveform");
+const ctx = canvas.getContext("2d");
+
+function drawWaveform() {
+    requestAnimationFrame(drawWaveform);
+
+    let data = new Uint8Array(analyser.fftSize);
+    analyser.getByteTimeDomainData(data);
+
+    ctx.fillStyle = "#111";
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+    ctx.lineWidth = 2;
+    ctx.strokeStyle = "#00eaff";
+    ctx.beginPath();
+
+    let slice = canvas.width / data.length;
+    let x = 0;
+
+    for (let i = 0; i < data.length; i++) {
+        let v = data[i] / 128.0;
+        let y = (v * canvas.height) / 2;
+
+        if (i === 0) ctx.moveTo(x, y);
+        else ctx.lineTo(x, y);
+
+        x += slice;
+    }
+
+    ctx.stroke();
+}
+
+drawWaveform();
+
+function generateBeat(promptText) {
+    const duration = 4;
+    const sampleRate = audioCtx.sampleRate;
+    const frameCount = sampleRate * duration;
+
+    let buffer = audioCtx.createBuffer(1, frameCount, sampleRate);
+    let data = buffer.getChannelData(0);
+
+    let kickFreq = promptText.includes("trap") ? 55 : 65;
+    let hatSpeed = promptText.includes("fast") ? 16 : 8;
+    let snareNoise = promptText.includes("snappy") ? 0.4 : 0.25;
+
+    for (let i = 0; i < frameCount; i++) {
+        let t = i / sampleRate;
+
+        let beatPos = Math.floor(t * hatSpeed) % 2;
+
+        let kick = Math.sin(2 * Math.PI * kickFreq * t) * Math.exp(-t * 6);
+
+        let snare = (Math.random() * 2 - 1) * snareNoise * (beatPos === 1 ? 1 : 0);
+
+        let hat = (Math.random() * 2 - 1) * 0.1 * (Math.floor(t * hatSpeed) % 2);
+
+        data[i] = kick + snare + hat;
+    }
+
+    bufferData = buffer;
+
+    let source = audioCtx.createBufferSource();
+    source.buffer = buffer;
+    source.connect(analyser);
+    analyser.connect(audioCtx.destination);
+    source.start();
+
+    exportWAV(buffer, (blob) => {
+        document.getElementById("player").src = URL.createObjectURL(blob);
+    });
+}
+
+function exportWAV(buffer, callback) {
+    let length = buffer.length;
+    let sampleRate = buffer.sampleRate;
+    let data = buffer.getChannelData(0);
+
+    let wavBuffer = new ArrayBuffer(44 + length * 2);
+    let view = new DataView(wavBuffer);
+
+    function writeString(offset, str) {
+        for (let i = 0; i < str.length; i++) {
+            view.setUint8(offset + i, str.charCodeAt(i));
+        }
+    }
+
+    writeString(0, "RIFF");
+    view.setUint32(4, 36 + length * 2, true);
+    writeString(8, "WAVE");
+    writeString(12, "fmt ");
+    view.setUint32(16, 16, true);
+    view.setUint16(20, 1, true);
+    view.setUint16(22, 1, true);
+    view.setUint32(24, sampleRate, true);
+    view.setUint32(28, sampleRate * 2, true);
+    view.setUint16(32, 2, true);
+    view.setUint16(34, 16, true);
+    writeString(36, "data");
+    view.setUint32(40, length * 2, true);
+
+    let offset = 44;
+    for (let i = 0; i < length; i++, offset += 2) {
+        let s = Math.max(-1, Math.min(1, data[i]));
+        view.setInt16(offset, s < 0 ? s * 0x8000 : s * 0x7FFF, true);
+    }
+
+    callback(new Blob([view], { type: "audio/wav" }));
+}
+
+document.getElementById("generateBtn").onclick = () => {
+    let promptText = document.getElementById("prompt").value.toLowerCase();
+    generateBeat(promptText);
+};
+
+document.getElementById("downloadBtn").onclick = () => {
+    if (!bufferData) return;
+    exportWAV(bufferData, (blob) => {
+        let a = document.createElement("a");
+        a.href = URL.createObjectURL(blob);
+        a.download = "maximus_v2_beat.wav";
+        a.click();
+    });
+};
+</script>
+
+</body>
+</html>
