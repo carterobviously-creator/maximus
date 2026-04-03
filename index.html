@@ -53,11 +53,11 @@
 
 <h1>Maximus V2</h1>
 
-<input id="prompt" placeholder="Describe your beat... (e.g. 'trap fast hats')" />
+<input id="prompt" placeholder="Describe your track... (e.g. 'dnb with trap beat, dark pads')" />
 
 <br>
 
-<button id="generateBtn">Generate Beat</button>
+<button id="generateBtn">Generate Track</button>
 
 <canvas id="waveform"></canvas>
 
@@ -104,30 +104,165 @@ function drawWaveform() {
 
 drawWaveform();
 
-function generateBeat(promptText) {
-    const duration = 4;
+function parseStyle(promptText) {
+    promptText = promptText.toLowerCase();
+    let style = {
+        bpm: 120,
+        trap: false,
+        dnb: false,
+        edm: false,
+        ambient: false,
+        hiphop: false,
+        dark: promptText.includes("dark"),
+        bright: promptText.includes("bright"),
+        lengthSeconds: 60
+    };
+
+    if (promptText.includes("dnb") || promptText.includes("drum and bass")) {
+        style.dnb = true;
+        style.bpm = 170;
+    }
+    if (promptText.includes("trap")) {
+        style.trap = true;
+        style.bpm = style.dnb ? 160 : 140;
+    }
+    if (promptText.includes("edm") || promptText.includes("house")) {
+        style.edm = true;
+        style.bpm = 128;
+    }
+    if (promptText.includes("ambient") || promptText.includes("chill")) {
+        style.ambient = true;
+        style.bpm = 80;
+    }
+    if (promptText.includes("hip hop") || promptText.includes("boom bap")) {
+        style.hiphop = true;
+        style.bpm = 90;
+    }
+
+    if (!style.trap && !style.dnb && !style.edm && !style.ambient && !style.hiphop) {
+        style.bpm = 120;
+    }
+
+    if (promptText.includes("short")) style.lengthSeconds = 30;
+    if (promptText.includes("long")) style.lengthSeconds = 120;
+    if (promptText.includes("full song") || promptText.includes("full track")) style.lengthSeconds = 180;
+
+    return style;
+}
+
+function generateSong(promptText) {
+    const style = parseStyle(promptText);
     const sampleRate = audioCtx.sampleRate;
+    const duration = style.lengthSeconds;
     const frameCount = sampleRate * duration;
 
     let buffer = audioCtx.createBuffer(1, frameCount, sampleRate);
     let data = buffer.getChannelData(0);
 
-    let kickFreq = promptText.includes("trap") ? 55 : 65;
-    let hatSpeed = promptText.includes("fast") ? 16 : 8;
-    let snareNoise = promptText.includes("snappy") ? 0.4 : 0.25;
+    const bpm = style.bpm;
+    const secondsPerBeat = 60 / bpm;
+    const beatsPerBar = 4;
+    const barLength = secondsPerBeat * beatsPerBar;
 
     for (let i = 0; i < frameCount; i++) {
         let t = i / sampleRate;
+        let beat = t / secondsPerBeat;
+        let bar = t / barLength;
+        let beatInBar = beat % beatsPerBar;
 
-        let beatPos = Math.floor(t * hatSpeed) % 2;
+        let drums = 0;
+        let bass = 0;
+        let synth = 0;
 
-        let kick = Math.sin(2 * Math.PI * kickFreq * t) * Math.exp(-t * 6);
+        // DRUMS
+        let kick = 0;
+        let snare = 0;
+        let hat = 0;
 
-        let snare = (Math.random() * 2 - 1) * snareNoise * (beatPos === 1 ? 1 : 0);
+        if (style.dnb) {
+            if (Math.abs(beatInBar - 0) < 0.05 || Math.abs(beatInBar - 1.5) < 0.05) {
+                kick = Math.sin(2 * Math.PI * 60 * t) * Math.exp(- (t % secondsPerBeat) * 20);
+            }
+            if (Math.abs(beatInBar - 1) < 0.05 || Math.abs(beatInBar - 2.5) < 0.05) {
+                snare = (Math.random() * 2 - 1) * 0.5 * Math.exp(- (t % secondsPerBeat) * 25);
+            }
+            if (Math.floor(beat * 4) % 2 === 0) {
+                hat = (Math.random() * 2 - 1) * 0.15;
+            }
+        } else if (style.trap) {
+            if (Math.abs(beatInBar - 0) < 0.05 || Math.abs(beatInBar - 2) < 0.05) {
+                kick = Math.sin(2 * Math.PI * 50 * t) * Math.exp(- (t % secondsPerBeat) * 15);
+            }
+            if (Math.abs(beatInBar - 1) < 0.05 || Math.abs(beatInBar - 3) < 0.05) {
+                snare = (Math.random() * 2 - 1) * 0.4 * Math.exp(- (t % secondsPerBeat) * 20);
+            }
+            if (Math.floor(beat * 8) % 2 === 0) {
+                hat = (Math.random() * 2 - 1) * 0.12;
+            }
+        } else if (style.edm) {
+            if (Math.abs(beatInBar - 0) < 0.05 || Math.abs(beatInBar - 1) < 0.05 ||
+                Math.abs(beatInBar - 2) < 0.05 || Math.abs(beatInBar - 3) < 0.05) {
+                kick = Math.sin(2 * Math.PI * 60 * t) * Math.exp(- (t % secondsPerBeat) * 18);
+            }
+            if (Math.abs(beatInBar - 1.5) < 0.05 || Math.abs(beatInBar - 3.5) < 0.05) {
+                snare = (Math.random() * 2 - 1) * 0.35 * Math.exp(- (t % secondsPerBeat) * 20);
+            }
+            if (Math.floor(beat * 4) % 2 === 0) {
+                hat = (Math.random() * 2 - 1) * 0.1;
+            }
+        } else if (style.ambient) {
+            if (Math.abs(beatInBar - 0) < 0.05) {
+                kick = Math.sin(2 * Math.PI * 40 * t) * Math.exp(- (t % secondsPerBeat) * 8);
+            }
+            if (Math.abs(beatInBar - 2) < 0.05) {
+                snare = (Math.random() * 2 - 1) * 0.2 * Math.exp(- (t % secondsPerBeat) * 10);
+            }
+            if (Math.floor(beat * 2) % 2 === 0) {
+                hat = (Math.random() * 2 - 1) * 0.05;
+            }
+        } else {
+            if (Math.abs(beatInBar - 0) < 0.05 || Math.abs(beatInBar - 2) < 0.05) {
+                kick = Math.sin(2 * Math.PI * 60 * t) * Math.exp(- (t % secondsPerBeat) * 15);
+            }
+            if (Math.abs(beatInBar - 1) < 0.05 || Math.abs(beatInBar - 3) < 0.05) {
+                snare = (Math.random() * 2 - 1) * 0.3 * Math.exp(- (t % secondsPerBeat) * 18);
+            }
+            if (Math.floor(beat * 4) % 2 === 0) {
+                hat = (Math.random() * 2 - 1) * 0.1;
+            }
+        }
 
-        let hat = (Math.random() * 2 - 1) * 0.1 * (Math.floor(t * hatSpeed) % 2);
+        drums = kick + snare + hat;
 
-        data[i] = kick + snare + hat;
+        // BASS
+        let baseFreq = 55;
+        if (style.dnb) baseFreq = 80;
+        if (style.trap) baseFreq = 45;
+        if (style.edm) baseFreq = 60;
+        if (style.ambient) baseFreq = 40;
+
+        let bassEnv = Math.max(0, Math.sin(Math.PI * (beatInBar / beatsPerBar)));
+        bass = Math.sin(2 * Math.PI * baseFreq * t) * bassEnv * 0.4;
+
+        // SYNTH
+        let synthFreq = style.bright ? 440 : 220;
+        if (style.dark) synthFreq *= 0.75;
+        if (style.ambient) synthFreq *= 0.5;
+
+        let section = Math.floor(bar) % 4; // 0 intro, 1 verse, 2 chorus, 3 bridge
+        let synthAmp = 0.0;
+        if (section === 0) synthAmp = 0.2;
+        if (section === 1) synthAmp = 0.3;
+        if (section === 2) synthAmp = 0.5;
+        if (section === 3) synthAmp = 0.35;
+
+        synth = (Math.sin(2 * Math.PI * synthFreq * t) +
+                 0.5 * Math.sin(2 * Math.PI * (synthFreq * 2) * t)) * synthAmp;
+
+        let sample = drums + bass + synth;
+        sample *= 0.6;
+
+        data[i] = sample;
     }
 
     bufferData = buffer;
@@ -181,8 +316,8 @@ function exportWAV(buffer, callback) {
 }
 
 document.getElementById("generateBtn").onclick = () => {
-    let promptText = document.getElementById("prompt").value.toLowerCase();
-    generateBeat(promptText);
+    let promptText = document.getElementById("prompt").value || "";
+    generateSong(promptText);
 };
 
 document.getElementById("downloadBtn").onclick = () => {
@@ -190,7 +325,7 @@ document.getElementById("downloadBtn").onclick = () => {
     exportWAV(bufferData, (blob) => {
         let a = document.createElement("a");
         a.href = URL.createObjectURL(blob);
-        a.download = "maximus_v2_beat.wav";
+        a.download = "maximus_v2_track.wav";
         a.click();
     });
 };
