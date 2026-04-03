@@ -1,4 +1,32 @@
+// Scheduler must live INSIDE the worklet
+function getSectionAtTime(timeSeconds, style) {
+    const bpm = style.bpm;
+    const secondsPerBeat = 60 / bpm;
+    const beatsPerBar = 4;
+    const barsPerSection = 8;
+    const sectionLength = secondsPerBeat * beatsPerBar * barsPerSection;
+
+    const index = Math.floor(timeSeconds / sectionLength);
+    const loopedIndex = index % style.structure.length;
+    const name = style.structure[loopedIndex];
+
+    const evolution = Math.min(1, timeSeconds / (style.lengthSeconds || 180));
+
+    return {
+        name,
+        evolution,
+        index: loopedIndex
+    };
+}
+
+// ⭐ THIS is the line your IDE deleted
 class MaximusProcessor extends AudioWorkletProcessor {
+    return {
+        name,
+        evolution,
+        index: loopedIndex
+    };
+}
     constructor() {
         super();
         this.sampleRate = sampleRate;
