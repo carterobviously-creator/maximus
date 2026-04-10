@@ -1,478 +1,187 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="UTF-8">
-<title>Maximus – Single File</title>
-<style>
-  body {
-    background: #000;
-    color: #00eaff;
-    font-family: Arial, sans-serif;
-    text-align: center;
-    padding: 40px;
-  }
-  h1 {
-    font-size: 3rem;
-    text-shadow: 0 0 15px #00eaff;
-    margin-bottom: 20px;
-  }
-  #prompt, #length {
-    padding: 12px;
-    font-size: 1.1rem;
-    border-radius: 10px;
-    border: 2px solid #00eaff;
-    background: #0a0a0a;
-    color: #00eaff;
-    outline: none;
-    box-shadow: 0 0 10px #00eaff;
-    margin: 5px;
-  }
-  #prompt { width: 60%; }
-  #length { width: 120px; }
-  button {
-    background: #00eaff;
-    border: none;
-    padding: 15px 30px;
-    margin: 15px;
-    font-size: 1.2rem;
-    cursor: pointer;
-    border-radius: 8px;
-    color: #000;
-    font-weight: bold;
-    box-shadow: 0 0 10px #00eaff;
-  }
-  canvas {
-    width: 100%;
-    height: 200px;
-    background: #111;
-    border: 2px solid #00eaff;
-    margin-top: 20px;
-    border-radius: 10px;
-  }
-</style>
+  <meta charset="UTF-8">
+  <title>Maximus Model Host</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <style>
+    :root {
+      --bg: #05060a;
+      --panel: #0b0d14;
+      --accent: #5cffc9;
+      --accent-soft: rgba(92, 255, 201, 0.15);
+      --text-main: #f5f7ff;
+      --text-soft: #9aa0c2;
+      --border: #1a1d2a;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background: radial-gradient(circle at top, #111426 0, #05060a 55%);
+      color: var(--text-main);
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 24px;
+    }
+    .shell {
+      width: 100%;
+      max-width: 720px;
+      background: linear-gradient(145deg, #05060a, #090b12);
+      border-radius: 18px;
+      border: 1px solid var(--border);
+      box-shadow:
+        0 0 0 1px rgba(0,0,0,0.6),
+        0 24px 60px rgba(0,0,0,0.85);
+      padding: 20px 22px 18px;
+    }
+    .header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 14px;
+    }
+    .title {
+      font-size: 18px;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: var(--text-soft);
+    }
+    .badge {
+      font-size: 11px;
+      padding: 4px 10px;
+      border-radius: 999px;
+      border: 1px solid var(--accent-soft);
+      background: radial-gradient(circle at top left, var(--accent-soft), transparent 60%);
+      color: var(--accent);
+    }
+    .block {
+      margin-top: 10px;
+      padding: 14px 14px 12px;
+      border-radius: 14px;
+      background: rgba(8, 10, 18, 0.9);
+      border: 1px solid var(--border);
+    }
+    .block h2 {
+      font-size: 14px;
+      text-transform: uppercase;
+      letter-spacing: 0.12em;
+      color: var(--text-soft);
+      margin-bottom: 8px;
+    }
+    .block p {
+      font-size: 13px;
+      line-height: 1.5;
+      color: var(--text-soft);
+      margin-bottom: 8px;
+    }
+    code {
+      font-family: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+      font-size: 12px;
+      background: rgba(10, 12, 22, 0.9);
+      padding: 2px 6px;
+      border-radius: 6px;
+      border: 1px solid rgba(92, 255, 201, 0.15);
+      color: var(--accent);
+    }
+    .file-list {
+      margin-top: 6px;
+      border-radius: 10px;
+      border: 1px solid var(--border);
+      overflow: hidden;
+    }
+    .file-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 7px 10px;
+      font-size: 13px;
+      background: rgba(6, 8, 16, 0.9);
+    }
+    .file-row:nth-child(2n) {
+      background: rgba(4, 6, 12, 0.9);
+    }
+    .file-row a {
+      color: var(--text-main);
+      text-decoration: none;
+    }
+    .file-row a:hover {
+      color: var(--accent);
+    }
+    .file-meta {
+      font-size: 11px;
+      color: var(--text-soft);
+    }
+    .footer {
+      margin-top: 10px;
+      font-size: 11px;
+      color: var(--text-soft);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      opacity: 0.8;
+    }
+  </style>
 </head>
 <body>
+  <main class="shell">
+    <header class="header">
+      <div class="title">Maximus / Model Host</div>
+      <div class="badge">Local‑first · Offline‑ready</div>
+    </header>
 
-<h1>Maximus – Single File</h1>
+    <section class="block">
+      <h2>Riffusion v1.5</h2>
+      <p>
+        This page exposes the Riffusion model files for Maximus. Your local Maximus client
+        can download from these URLs and cache them for fully offline music generation.
+      </p>
+      <p>
+        Base path for this model:
+        <code>/models/riffusion/</code>
+      </p>
 
-<input id="prompt" placeholder="Describe your track..." />
-<input id="length" type="number" min="10" max="600" placeholder="Length (sec)" />
+      <div class="file-list">
+        <div class="file-row">
+          <div>
+            <a href="models/riffusion/riffusion-model-v1.safetensors">riffusion-model-v1.safetensors</a>
+            <div class="file-meta">Main model weights</div>
+          </div>
+        </div>
+        <div class="file-row">
+          <div>
+            <a href="models/riffusion/model.yaml">model.yaml</a>
+            <div class="file-meta">Model configuration</div>
+          </div>
+        </div>
+        <div class="file-row">
+          <div>
+            <a href="models/riffusion/v1-inference.yaml">v1-inference.yaml</a>
+            <div class="file-meta">Inference settings</div>
+          </div>
+        </div>
+      </div>
+    </section>
 
-<br>
+    <section class="block">
+      <h2>Client integration</h2>
+      <p>
+        A Maximus client can construct URLs like:
+      </p>
+      <p>
+        <code>BASE_URL + "/models/riffusion/riffusion-model-v1.safetensors"</code>
+      </p>
+      <p>
+        On first run, download to a local cache directory (for example
+        <code>./models/riffusion/</code>) and reuse the cached files for all future sessions.
+      </p>
+    </section>
 
-<button id="generateBtn">Generate Track</button>
-
-<canvas id="waveform"></canvas>
-
-<audio id="player" controls></audio>
-
-<button id="downloadBtn">Download WAV</button>
-
-<script>
-/* ---------- WAV PCM RECORDER (JS version of TS design) ---------- */
-class PCMRecorder {
-  constructor(sampleRate) {
-    this.sampleRate = sampleRate;
-    this.buffers = [];
-    this.recording = false;
-  }
-  addSamples(samples) {
-    if (!this.recording) return;
-    this.buffers.push(new Float32Array(samples));
-  }
-  start() {
-    this.buffers = [];
-    this.recording = true;
-  }
-  stop() {
-    this.recording = false;
-    let totalLength = this.buffers.reduce((s, b) => s + b.length, 0);
-    let merged = new Float32Array(totalLength);
-    let offset = 0;
-    for (const b of this.buffers) {
-      merged.set(b, offset);
-      offset += b.length;
-    }
-    const wav = this.encodeWAV(merged);
-    return new Blob([wav], { type: "audio/wav" });
-  }
-  encodeWAV(samples) {
-    const numChannels = 1;
-    const bytesPerSample = 2;
-    const blockAlign = numChannels * bytesPerSample;
-    const byteRate = this.sampleRate * blockAlign;
-    const buffer = new ArrayBuffer(44 + samples.length * bytesPerSample);
-    const view = new DataView(buffer);
-
-    this.writeString(view, 0, "RIFF");
-    view.setUint32(4, 36 + samples.length * bytesPerSample, true);
-    this.writeString(view, 8, "WAVE");
-
-    this.writeString(view, 12, "fmt ");
-    view.setUint32(16, 16, true);
-    view.setUint16(20, 1, true);
-    view.setUint16(22, numChannels, true);
-    view.setUint32(24, this.sampleRate, true);
-    view.setUint32(28, byteRate, true);
-    view.setUint16(32, blockAlign, true);
-    view.setUint16(34, bytesPerSample * 8, true);
-
-    this.writeString(view, 36, "data");
-    view.setUint32(40, samples.length * bytesPerSample, true);
-
-    let offset = 44;
-    for (let i = 0; i < samples.length; i++) {
-      let s = Math.max(-1, Math.min(1, samples[i]));
-      view.setInt16(offset, s * 0x7fff, true);
-      offset += 2;
-    }
-    return buffer;
-  }
-  writeString(view, offset, str) {
-    for (let i = 0; i < str.length; i++) {
-      view.setUint8(offset + i, str.charCodeAt(i));
-    }
-  }
-}
-
-/* ---------- GLOBALS ---------- */
-let audioCtx = null;
-let analyser = null;
-let maximusNode = null;
-let recorder = null;
-let scriptNode = null;
-let recordedBlob = null;
-
-const canvas = document.getElementById("waveform");
-const cctx = canvas.getContext("2d");
-
-function ensureAudioContext() {
-  if (!audioCtx) {
-    audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-    analyser = audioCtx.createAnalyser();
-    analyser.fftSize = 2048;
-  }
-}
-
-function drawWaveform() {
-  requestAnimationFrame(drawWaveform);
-  if (!analyser) return;
-  let data = new Uint8Array(analyser.fftSize);
-  analyser.getByteTimeDomainData(data);
-
-  cctx.fillStyle = "#111";
-  cctx.fillRect(0, 0, canvas.width, canvas.height);
-
-  cctx.lineWidth = 2;
-  cctx.strokeStyle = "#00eaff";
-  cctx.beginPath();
-
-  let slice = canvas.width / data.length;
-  let x = 0;
-  for (let i = 0; i < data.length; i++) {
-    let v = data[i] / 128.0;
-    let y = (v * canvas.height) / 2;
-    if (i === 0) cctx.moveTo(x, y);
-    else cctx.lineTo(x, y);
-    x += slice;
-  }
-  cctx.stroke();
-}
-drawWaveform();
-
-/* ---------- STYLE PARSER ---------- */
-function parseStyle(promptText, lengthOverride) {
-  const text = (promptText || "").toLowerCase();
-  const style = {
-    genres: [],
-    mood: "neutral",
-    energy: "medium",
-    instruments: [],
-    vocals: false,
-    structure: [],
-    bpm: 120,
-    lengthSeconds: 60
-  };
-
-  const genreMap = {
-    "trap": "trap",
-    "dnb": "drum and bass",
-    "drum and bass": "drum and bass",
-    "edm": "edm",
-    "house": "house",
-    "ambient": "ambient",
-    "chill": "ambient",
-    "hip hop": "hip hop",
-    "boom bap": "boom bap",
-    "synthwave": "synthwave",
-    "lofi": "lofi",
-    "dubstep": "dubstep",
-    "drill": "drill"
-  };
-  for (const key in genreMap) {
-    if (text.includes(key)) style.genres.push(genreMap[key]);
-  }
-  if (style.genres.length === 0) style.genres.push("generic");
-
-  if (text.includes("dark")) style.mood = "dark";
-  if (text.includes("bright")) style.mood = "bright";
-  if (text.includes("sad")) style.mood = "sad";
-  if (text.includes("happy")) style.mood = "happy";
-  if (text.includes("cinematic")) style.mood = "cinematic";
-  if (text.includes("dreamy")) style.mood = "dreamy";
-
-  if (text.includes("high energy") || text.includes("hype") || text.includes("fast")) style.energy = "high";
-  if (text.includes("low energy") || text.includes("chill") || text.includes("slow")) style.energy = "low";
-
-  const instrumentKeywords = [
-    "deep bass", "bass", "808", "reese", "sub",
-    "pads", "pad", "lead", "melody", "synth", "bells", "piano", "keys", "atmospheric"
-  ];
-  instrumentKeywords.forEach(inst => {
-    if (text.includes(inst)) style.instruments.push(inst);
-  });
-
-  if (text.includes("vocal") || text.includes("rap") || text.includes("singer") || text.includes("space for vocals"))
-    style.vocals = true;
-
-  const structureKeywords = ["intro", "build", "drop", "verse", "chorus", "hook", "bridge", "outro"];
-  structureKeywords.forEach(part => {
-    if (text.includes(part)) style.structure.push(part);
-  });
-  if (style.structure.length === 0) {
-    style.structure = ["intro", "build", "drop", "verse", "chorus", "bridge", "outro"];
-  }
-
-  function pickBpm(genres) {
-    if (genres.includes("drum and bass")) return 170;
-    if (genres.includes("dubstep")) return 140;
-    if (genres.includes("trap") || genres.includes("drill")) return 140;
-    if (genres.includes("edm") || genres.includes("house")) return 128;
-    if (genres.includes("hip hop") || genres.includes("boom bap")) return 90;
-    if (genres.includes("lofi")) return 80;
-    if (genres.includes("ambient")) return 75;
-    return 120;
-  }
-  style.bpm = pickBpm(style.genres);
-  if (style.energy === "high") style.bpm += 5;
-  if (style.energy === "low") style.bpm -= 5;
-
-  if (!isNaN(lengthOverride) && lengthOverride > 5 && lengthOverride <= 600)
-    style.lengthSeconds = lengthOverride;
-
-  const lengthMatch = text.match(/(\d+)\s*(seconds|second|sec|minutes|minute|min)/);
-  if (lengthMatch) {
-    let num = parseInt(lengthMatch[1]);
-    if (lengthMatch[2].includes("min")) num *= 60;
-    style.lengthSeconds = Math.max(10, Math.min(num, 600));
-  }
-
-  if (text.includes("short")) style.lengthSeconds = 30;
-  if (text.includes("long")) style.lengthSeconds = 120;
-  if (text.includes("full song") || text.includes("full track")) style.lengthSeconds = 180;
-
-  return style;
-}
-
-/* ---------- WORKLET CODE (INLINE) ---------- */
-const workletCode = `
-function getSectionAtTime(timeSeconds, style) {
-  const bpm = style.bpm;
-  const secondsPerBeat = 60 / bpm;
-  const beatsPerBar = 4;
-  const barsPerSection = 8;
-  const sectionLength = secondsPerBeat * beatsPerBar * barsPerSection;
-  const index = Math.floor(timeSeconds / sectionLength);
-  const loopedIndex = index % style.structure.length;
-  const name = style.structure[loopedIndex];
-  const evolution = Math.min(1, timeSeconds / (style.lengthSeconds || 180));
-  return { name, evolution, index: loopedIndex };
-}
-
-class MaximusProcessor extends AudioWorkletProcessor {
-  constructor() {
-    super();
-    this.time = 0;
-    this.style = null;
-    this.port.onmessage = (event) => {
-      const msg = event.data;
-      if (msg.type === "init") {
-        this.style = msg.style;
-        this.time = 0;
-      }
-      if (msg.type === "stop") {
-        this.style = null;
-      }
-    };
-  }
-  hasGenre(g) {
-    return this.style && this.style.genres.includes(g);
-  }
-  process(inputs, outputs, parameters) {
-    const output = outputs[0];
-    const channel = output[0];
-    if (!this.style) {
-      for (let i = 0; i < channel.length; i++) channel[i] = 0;
-      return true;
-    }
-    const style = this.style;
-    const sr = sampleRate;
-    const bpm = style.bpm;
-    const secondsPerBeat = 60 / bpm;
-    const beatsPerBar = 4;
-    const barLength = secondsPerBeat * beatsPerBar;
-
-    for (let i = 0; i < channel.length; i++) {
-      const t = this.time;
-      const beat = t / secondsPerBeat;
-      const beatInBar = beat % beatsPerBar;
-      const section = getSectionAtTime(t, style);
-      const sectionName = section.name;
-
-      let drums = 0, bass = 0, synth = 0, vocal = 0;
-      let kick = 0, snare = 0, hat = 0;
-
-      if (this.hasGenre("drum and bass")) {
-        if (Math.abs(beatInBar - 0) < 0.04 || Math.abs(beatInBar - 1.5) < 0.04)
-          kick = Math.sin(2 * Math.PI * 60 * t) * Math.exp(-(t % secondsPerBeat) * 22);
-        if (Math.abs(beatInBar - 1) < 0.04 || Math.abs(beatInBar - 2.5) < 0.04)
-          snare = (Math.random() * 2 - 1) * 0.5 * Math.exp(-(t % secondsPerBeat) * 26);
-        if (Math.floor(beat * 4) % 2 === 0)
-          hat = (Math.random() * 2 - 1) * 0.16;
-      }
-      if (this.hasGenre("trap") || this.hasGenre("drill")) {
-        if (Math.abs(beatInBar - 0) < 0.05 || Math.abs(beatInBar - 2) < 0.05)
-          kick += Math.sin(2 * Math.PI * 50 * t) * Math.exp(-(t % secondsPerBeat) * 18);
-        if (Math.abs(beatInBar - 1) < 0.05 || Math.abs(beatInBar - 3) < 0.05)
-          snare += (Math.random() * 2 - 1) * 0.4 * Math.exp(-(t % secondsPerBeat) * 22);
-        if (Math.floor(beat * 8) % 2 === 0)
-          hat += (Math.random() * 2 - 1) * 0.12;
-      }
-      if (this.hasGenre("edm") || this.hasGenre("house")) {
-        if (Math.abs(beatInBar - 0) < 0.05 || Math.abs(beatInBar - 1) < 0.05 ||
-            Math.abs(beatInBar - 2) < 0.05 || Math.abs(beatInBar - 3) < 0.05)
-          kick += Math.sin(2 * Math.PI * 60 * t) * Math.exp(-(t % secondsPerBeat) * 18);
-        if (Math.abs(beatInBar - 1.5) < 0.05 || Math.abs(beatInBar - 3.5) < 0.05)
-          snare += (Math.random() * 2 - 1) * 0.35 * Math.exp(-(t % secondsPerBeat) * 20);
-        if (Math.floor(beat * 4) % 2 === 0)
-          hat += (Math.random() * 2 - 1) * 0.1;
-      }
-      if (this.hasGenre("ambient") || this.hasGenre("lofi")) {
-        if (Math.abs(beatInBar - 0) < 0.05)
-          kick += Math.sin(2 * Math.PI * 40 * t) * Math.exp(-(t % secondsPerBeat) * 8);
-        if (Math.abs(beatInBar - 2) < 0.05)
-          snare += (Math.random() * 2 - 1) * 0.2 * Math.exp(-(t % secondsPerBeat) * 10);
-        if (Math.floor(beat * 2) % 2 === 0)
-          hat += (Math.random() * 2 - 1) * 0.05;
-      }
-      if (this.hasGenre("generic")) {
-        if (Math.abs(beatInBar - 0) < 0.05 || Math.abs(beatInBar - 2) < 0.05)
-          kick += Math.sin(2 * Math.PI * 60 * t) * Math.exp(-(t % secondsPerBeat) * 15);
-        if (Math.abs(beatInBar - 1) < 0.05 || Math.abs(beatInBar - 3) < 0.05)
-          snare += (Math.random() * 2 - 1) * 0.3 * Math.exp(-(t % secondsPerBeat) * 18);
-        if (Math.floor(beat * 4) % 2 === 0)
-          hat += (Math.random() * 2 - 1) * 0.1;
-      }
-
-      drums = kick + snare + hat;
-
-      let baseFreq = 55;
-      if (this.hasGenre("drum and bass")) baseFreq = 80;
-      if (this.hasGenre("trap") || this.hasGenre("drill")) baseFreq = 45;
-      if (this.hasGenre("edm") || this.hasGenre("house")) baseFreq = 60;
-      let bassEnv = Math.max(0, Math.sin(Math.PI * (beatInBar / beatsPerBar)));
-      bass = Math.sin(2 * Math.PI * baseFreq * t) * bassEnv * 0.4;
-
-      let synthFreq = 220;
-      let mod = 1 + 0.1 * Math.sin(2 * Math.PI * (t / (barLength * 4)));
-      synth = Math.sin(2 * Math.PI * synthFreq * mod * t) * 0.4;
-
-      if (style.vocals && (sectionName.includes("verse") || sectionName.includes("chorus"))) {
-        let vowelFreq = 300 + 200 * Math.sin(t * 0.5);
-        let f1 = Math.sin(2 * Math.PI * vowelFreq * t);
-        let f2 = Math.sin(2 * Math.PI * vowelFreq * 2.5 * t);
-        vocal = (f1 * 0.4 + f2 * 0.2) * 0.3;
-      }
-
-      let sample = drums + bass + synth + vocal;
-      sample *= 0.6;
-      channel[i] = sample;
-      this.time += 1 / sr;
-    }
-    return true;
-  }
-}
-registerProcessor("maximus-processor", MaximusProcessor);
-`;
-
-/* ---------- START MAXIMUS ---------- */
-async function startMaximus(promptText, lengthOverride) {
-  ensureAudioContext();
-  const style = parseStyle(promptText, lengthOverride);
-
-  const blob = new Blob([workletCode], { type: "application/javascript" });
-  const url = URL.createObjectURL(blob);
-  if (!startMaximus.workletLoaded) {
-    await audioCtx.audioWorklet.addModule(url);
-    startMaximus.workletLoaded = true;
-  }
-
-  if (maximusNode) {
-    maximusNode.port.postMessage({ type: "stop" });
-    maximusNode.disconnect();
-    maximusNode = null;
-  }
-
-  maximusNode = new AudioWorkletNode(audioCtx, "maximus-processor", {
-    numberOfInputs: 0,
-    numberOfOutputs: 1,
-    outputChannelCount: [1]
-  });
-
-  maximusNode.port.postMessage({ type: "init", style });
-
-  maximusNode.connect(analyser);
-  analyser.connect(audioCtx.destination);
-
-  recorder = new PCMRecorder(audioCtx.sampleRate);
-
-  if (scriptNode) {
-    scriptNode.disconnect();
-    scriptNode = null;
-  }
-
-  scriptNode = audioCtx.createScriptProcessor(2048, 1, 1);
-  maximusNode.connect(scriptNode);
-  scriptNode.connect(audioCtx.destination);
-  scriptNode.onaudioprocess = (e) => {
-    const input = e.inputBuffer.getChannelData(0);
-    recorder.addSamples(input);
-  };
-
-  recorder.start();
-}
-
-/* ---------- UI HOOKS ---------- */
-document.getElementById("generateBtn").onclick = () => {
-  const promptText = document.getElementById("prompt").value || "";
-  const lengthVal = parseFloat(document.getElementById("length").value);
-  startMaximus(promptText, lengthVal);
-};
-
-document.getElementById("downloadBtn").onclick = () => {
-  if (!recorder) return;
-  const blob = recorder.stop();
-  recordedBlob = blob;
-  const url = URL.createObjectURL(blob);
-  const player = document.getElementById("player");
-  player.src = url;
-
-  const a = document.createElement("a");
-  a.href = url;
-  a.download = "maximus.wav";
-  a.click();
-};
-</script>
-
+    <footer class="footer">
+      <span>Maximus · Riffusion core</span>
+      <span>No accounts · No tracking · Just files</span>
+    </footer>
+  </main>
 </body>
 </html>
