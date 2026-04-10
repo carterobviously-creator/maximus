@@ -1,110 +1,107 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <title>Maximus Lite</title>
-  <style>
-    body { background: #0a0a0f; color: #e0e0e0; font-family: monospace; padding: 2rem; }
-    h1 { color: #00ffaa; }
-    input, button { font-size: 1.1rem; padding: 0.5rem 1rem; margin: 0.5rem 0; }
-    input { width: 400px; background: #1a1a2e; color: #fff; border: 1px solid #00ffaa; }
-    button { background: #00ffaa; color: #0a0a0f; border: none; cursor: pointer; }
-    button:disabled { opacity: 0.4; cursor: wait; }
-    #status { color: #888; margin-top: 1rem; white-space: pre-line; }
-    audio { margin-top: 1rem; display: block; }
-  </style>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Maximus Lite</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+:root{--bg:#08080c;--bg2:#0e0e16;--bg3:#12121c;--brd:#1a1a2e;--brd2:#252540;--tx:#c8c8d0;--tx2:#666;--tx3:#444;--ac:#00ffaa;--ac2:rgba(0,255,170,.12);--red:#ff4455;--warn:#ffaa00}
+body{background:var(--bg);color:var(--tx);font-family:'Segoe UI',system-ui,sans-serif;min-height:100vh}
+::selection{background:var(--ac);color:var(--bg)}
+::-webkit-scrollbar{width:6px}::-webkit-scrollbar-track{background:var(--bg2)}::-webkit-scrollbar-thumb{background:var(--brd2);border-radius:3px}
+.hdr{display:flex;align-items:center;justify-content:space-between;padding:1.2rem 2rem;border-bottom:1px solid var(--brd);backdrop-filter:blur(12px);position:sticky;top:0;z-index:10;background:rgba(8,8,12,.85)}
+.logo{font-size:1.2rem;font-weight:800;letter-spacing:3px;color:var(--ac);text-shadow:0 0 20px rgba(0,255,170,.3)}
+.badge{display:flex;align-items:center;gap:.5rem;font-size:.72rem;color:var(--tx2);text-transform:uppercase;letter-spacing:1px}
+.dot{width:7px;height:7px;border-radius:50%;background:var(--tx3);flex-shrink:0;transition:background .3s}
+.dot.on{background:var(--ac);box-shadow:0 0 8px var(--ac)}.dot.load{background:var(--warn);animation:pulse 1s infinite}.dot.err{background:var(--red)}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.4}}
+.main{max-width:720px;margin:0 auto;padding:1.5rem 1.5rem 4rem}
+.card{background:var(--bg2);border:1px solid var(--brd);border-radius:10px;padding:1.4rem;margin-bottom:1.2rem;transition:border-color .2s}.card:hover{border-color:var(--brd2)}
+.lbl{font-size:.65rem;text-transform:uppercase;letter-spacing:2px;color:var(--tx3);margin-bottom:.7rem;font-weight:600}
+.prompt{width:100%;background:var(--bg3);border:1px solid var(--brd2);border-radius:8px;padding:.75rem 1rem;color:var(--tx);font-size:.95rem;outline:none;transition:border-color .2s;font-family:inherit}
+.prompt:focus{border-color:var(--ac);box-shadow:0 0 0 2px var(--ac2)}.prompt::placeholder{color:var(--tx3)}
+.pills{display:flex;flex-wrap:wrap;gap:.4rem;margin-top:.2rem}
+.pill{background:var(--bg3);border:1px solid var(--brd2);border-radius:20px;padding:.35rem .8rem;font-size:.75rem;color:var(--tx2);cursor:pointer;transition:all .15s;user-select:none}
+.pill:hover{border-color:var(--ac);color:var(--ac)}.pill.on{background:var(--ac2);border-color:var(--ac);color:var(--ac);font-weight:600}
+.slider-row{display:flex;align-items:center;gap:1rem;margin-top:.3rem}
+.slider{flex:1;-webkit-appearance:none;appearance:none;height:3px;background:var(--brd2);border-radius:2px;outline:none}
+.slider::-webkit-slider-thumb{-webkit-appearance:none;width:14px;height:14px;background:var(--ac);border-radius:50%;cursor:pointer;box-shadow:0 0 8px rgba(0,255,170,.3)}
+.slider-val{font-size:.85rem;color:var(--ac);min-width:32px;text-align:right;font-weight:600;font-variant-numeric:tabular-nums}
+.btn-gen{width:100%;padding:.85rem;background:linear-gradient(135deg,#00ffaa,#00cc88);border:none;border-radius:8px;color:var(--bg);font-size:.95rem;font-weight:700;letter-spacing:1.5px;cursor:pointer;margin-top:1rem;transition:all .15s;text-transform:uppercase}
+.btn-gen:hover{box-shadow:0 4px 24px rgba(0,255,170,.25);transform:translateY(-1px)}.btn-gen:disabled{opacity:.35;cursor:wait;transform:none;box-shadow:none}
+.btn-sm{background:var(--bg3);border:1px solid var(--brd2);border-radius:6px;padding:.45rem .9rem;color:var(--tx2);font-size:.75rem;cursor:pointer;transition:all .15s;font-family:inherit}.btn-sm:hover{border-color:var(--ac);color:var(--ac)}.btn-ac{border-color:var(--ac);color:var(--ac)}
+.prog-wrap{display:none;margin-top:1rem}.prog-track{height:3px;background:var(--brd2);border-radius:2px;overflow:hidden}
+.prog-fill{height:100%;background:var(--ac);border-radius:2px;width:0%;transition:width .3s;box-shadow:0 0 8px var(--ac)}.prog-fill.pulse{animation:barPulse 1.5s ease-in-out infinite}
+@keyframes barPulse{0%{opacity:1}50%{opacity:.5}100%{opacity:1}}
+.prog-txt{font-size:.72rem;color:var(--tx3);margin-top:.5rem;font-variant-numeric:tabular-nums}
+.player{display:none}.wave-wrap{background:var(--bg3);border-radius:8px;overflow:hidden;position:relative;cursor:pointer}
+.wave-canvas{width:100%;height:72px;display:block}.wave-cursor{position:absolute;top:0;left:0;width:2px;height:100%;background:var(--ac);box-shadow:0 0 6px var(--ac);pointer-events:none;transition:left .05s linear}
+.p-row{display:flex;align-items:center;gap:.8rem;margin-top:.8rem}
+.p-play{width:36px;height:36px;border-radius:50%;background:var(--ac);border:none;cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:.9rem;color:var(--bg);transition:box-shadow .15s;flex-shrink:0}.p-play:hover{box-shadow:0 0 16px rgba(0,255,170,.4)}
+.p-time{font-size:.78rem;color:var(--tx2);font-variant-numeric:tabular-nums;min-width:90px}.p-actions{margin-left:auto;display:flex;gap:.5rem}
+.lib{display:none}.clips{display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:.6rem;margin-top:.3rem}
+.clip{background:var(--bg3);border:1px solid var(--brd2);border-radius:8px;padding:.7rem;cursor:pointer;transition:all .15s;position:relative}.clip:hover{border-color:var(--ac)}
+.clip-name{font-size:.78rem;color:var(--tx);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.clip-dur{font-size:.65rem;color:var(--tx3);margin-top:.2rem}
+.clip-del{position:absolute;top:4px;right:6px;background:none;border:none;color:var(--tx3);cursor:pointer;font-size:.7rem;padding:2px}.clip-del:hover{color:var(--red)}
+.stitch-row{display:flex;gap:.6rem;margin-top:1rem}.stitch-row .btn-sm{flex:1;text-align:center;padding:.6rem}
+.status{font-size:.72rem;color:var(--tx3);text-align:center;margin-top:.8rem}
+@media(max-width:600px){.main{padding:1rem}.hdr{padding:1rem}.card{padding:1rem}.clips{grid-template-columns:repeat(auto-fill,minmax(100px,1fr))}}
+</style>
 </head>
 <body>
-  <h1>⚡ Maximus Lite</h1>
-  <p>Browser-only music generator — no servers, no Python, no Node.</p>
-  <input id="prompt" type="text" placeholder="chill lo-fi beat, 90 bpm" />
-  <br>
-  <button id="generate" onclick="generate()">Generate Music</button>
-  <div id="status">Ready. First run downloads ~458 MB model (cached after).</div>
-  <audio id="player" controls style="display:none"></audio>
-
-  <script type="module">
-    import { AutoTokenizer, MusicgenForConditionalGeneration } from
-      'https://cdn.jsdelivr.net/npm/@huggingface/transformers@3';
-
-    let tokenizer, model, loaded = false;
-    const status = document.getElementById('status');
-    const btn = document.getElementById('generate');
-
-    async function loadModel() {
-      status.textContent = 'Loading model (~458 MB first time, cached after)...';
-      tokenizer = await AutoTokenizer.from_pretrained('Xenova/musicgen-small');
-      model = await MusicgenForConditionalGeneration.from_pretrained(
-        'Xenova/musicgen-small',
-        {
-          dtype: {
-            text_encoder: 'q4f16',
-            decoder_model_merged: 'q4',
-            encodec_decode: 'q4f16',
-          },
-        }
-      );
-      loaded = true;
-      status.textContent = 'Model loaded. Ready to generate.';
-    }
-
-    window.generate = async function() {
-      btn.disabled = true;
-      try {
-        if (!loaded) await loadModel();
-
-        const prompt = document.getElementById('prompt').value || 'chill lo-fi beat';
-        status.textContent = 'Generating audio... (30-120 sec)';
-
-        const inputs = tokenizer(prompt);
-        const audio_values = await model.generate({
-          ...inputs,
-          max_new_tokens: 500,
-          do_sample: true,
-          guidance_scale: 3,
-        });
-
-        // Convert to WAV and play
-        const sampleRate = model.config.audio_encoder.sampling_rate;
-        const audioData = audio_values.data;
-        const wavBlob = float32ToWav(audioData, sampleRate);
-        const url = URL.createObjectURL(wavBlob);
-
-        const player = document.getElementById('player');
-        player.src = url;
-        player.style.display = 'block';
-        player.play();
-        status.textContent = 'Done! Playing audio.';
-      } catch (e) {
-        status.textContent = 'Error: ' + e.message;
-        console.error(e);
-      }
-      btn.disabled = false;
-    };
-
-    function float32ToWav(float32Array, sampleRate) {
-      const buffer = new ArrayBuffer(44 + float32Array.length * 2);
-      const view = new DataView(buffer);
-      const writeStr = (o, s) => { for (let i = 0; i < s.length; i++) view.setUint8(o + i, s.charCodeAt(i)); };
-      writeStr(0, 'RIFF');
-      view.setUint32(4, 36 + float32Array.length * 2, true);
-      writeStr(8, 'WAVE');
-      writeStr(12, 'fmt ');
-      view.setUint32(16, 16, true);
-      view.setUint16(20, 1, true);
-      view.setUint16(22, 1, true);
-      view.setUint32(24, sampleRate, true);
-      view.setUint32(28, sampleRate * 2, true);
-      view.setUint16(32, 2, true);
-      view.setUint16(34, 16, true);
-      writeStr(36, 'data');
-      view.setUint32(40, float32Array.length * 2, true);
-      for (let i = 0; i < float32Array.length; i++) {
-        const s = Math.max(-1, Math.min(1, float32Array[i]));
-        view.setInt16(44 + i * 2, s < 0 ? s * 0x8000 : s * 0x7FFF, true);
-      }
-      return new Blob([buffer], { type: 'audio/wav' });
-    }
-  </script>
+<header class="hdr"><div class="logo">⚡ MAXIMUS LITE</div><div class="badge"><span class="dot" id="dot"></span><span id="statusTxt">Idle</span></div></header>
+<main class="main">
+<div class="card">
+<div class="lbl">Prompt</div>
+<input class="prompt" id="prompt" type="text" placeholder="heavy dnb with amen breaks and reese bass" spellcheck="false"/>
+<div class="lbl" style="margin-top:1.1rem">Genre</div><div class="pills" id="pills"></div>
+<div class="lbl" style="margin-top:1.1rem">Duration</div>
+<div class="slider-row"><input class="slider" id="dur" type="range" min="10" max="30" value="20" step="5"/><span class="slider-val" id="durVal">20s</span></div>
+<button class="btn-gen" id="genBtn">Generate</button>
+<div class="prog-wrap" id="progWrap"><div class="prog-track"><div class="prog-fill" id="progFill"></div></div><div class="prog-txt" id="progTxt">Preparing...</div></div>
+</div>
+<div class="card player" id="playerCard">
+<div class="lbl">Now Playing</div>
+<div class="wave-wrap" id="waveWrap"><canvas class="wave-canvas" id="waveCanvas"></canvas><div class="wave-cursor" id="waveCursor"></div></div>
+<div class="p-row"><button class="p-play" id="playBtn">▶</button><span class="p-time" id="pTime">0:00 / 0:00</span><div class="p-actions"><button class="btn-sm" id="saveBtn">+ Save</button><button class="btn-sm btn-ac" id="dlBtn">↓ WAV</button></div></div>
+</div>
+<div class="card lib" id="libCard">
+<div class="lbl">Clip Library <span id="clipCount"></span></div><div class="clips" id="clipsGrid"></div>
+<div class="stitch-row" id="stitchRow" style="display:none"><button class="btn-sm btn-ac" id="stitchBtn">Stitch → Full Track</button><button class="btn-sm" id="dlStitchBtn">↓ Download Stitched</button></div>
+</div>
+<div class="status" id="footStatus">Model loads on first generate (~460 MB, cached after).</div>
+</main>
+<script>
+const G={'DnB':'drum and bass, fast breakbeats, 174 bpm, heavy sub bass, reese bass, amen break, energetic electronic','Lo-Fi':'lo-fi hip hop, chill beats, vinyl crackle, soft piano, jazzy chords, 85 bpm, mellow relaxing','Techno':'techno, four on the floor kick, 130 bpm, dark synthesizers, industrial, hypnotic repetitive','House':'house music, four on the floor, 124 bpm, funky bassline, piano chords, uplifting vocal','Ambient':'ambient electronic, atmospheric pads, slow textures, ethereal reverb, 70 bpm, peaceful','Trap':'trap beats, 808 sub bass, hi-hat rolls, snare rolls, 140 bpm, dark hard hitting','Synthwave':'synthwave, retro 80s synths, arpeggios, pulsing bass, neon, 110 bpm, cinematic','Jazz':'jazz, saxophone, piano trio, upright bass, brushed drums, swing, 120 bpm, smooth','Metal':'heavy metal, distorted electric guitar, double bass drums, aggressive, 160 bpm, powerful','Funk':'funk, slap bass, wah guitar, tight drums, groovy, 110 bpm, brass stabs','Reggae':'reggae, offbeat guitar, deep bass, 80 bpm, laid back, island vibes, dub','Classical':'classical orchestral, strings, woodwinds, brass, symphonic, dramatic, cinematic score'};
+let selGenre=null,worker=null,curAudio=null,curSR=32000,actx=null,srcNode=null,playing=false,startedAt=0,pausedAt=0,clips=[],stitchedBuf=null;
+const $=id=>document.getElementById(id),dot=$('dot'),sTxt=$('statusTxt'),genBtn=$('genBtn'),progWrap=$('progWrap'),progFill=$('progFill'),progTxt=$('progTxt'),playerCard=$('playerCard'),waveCanvas=$('waveCanvas'),waveCursor=$('waveCursor'),playBtn=$('playBtn'),pTime=$('pTime'),libCard=$('libCard'),clipsGrid=$('clipsGrid'),stitchRow=$('stitchRow'),durSlider=$('dur'),durVal=$('durVal'),footStatus=$('footStatus');
+const pillBox=$('pills');Object.keys(G).forEach(n=>{const p=document.createElement('button');p.className='pill';p.textContent=n;p.onclick=()=>{if(selGenre===n){selGenre=null;p.classList.remove('on')}else{document.querySelectorAll('.pill').forEach(x=>x.classList.remove('on'));selGenre=n;p.classList.add('on')}};pillBox.appendChild(p)});
+durSlider.oninput=()=>{durVal.textContent=durSlider.value+'s'};
+function enhance(raw){let p=raw.trim();if(selGenre&&G[selGenre]){p=G[selGenre]+(p?', '+p:'')}else{const lo=p.toLowerCase();const abbr={dnb:'DnB','drum and bass':'DnB',lofi:'Lo-Fi','lo fi':'Lo-Fi',edm:'House'};for(const[k,v]of Object.entries(abbr)){if(lo.includes(k)){p=p.replace(new RegExp(k,'gi'),'')+', '+G[v];break}}if(p===raw.trim()){for(const[n,d]of Object.entries(G)){if(lo.includes(n.toLowerCase())){p+=', '+d;break}}}}return p.replace(/,\s*,/g,',').replace(/^[\s,]+|[\s,]+$/g,'')||'electronic music, synth melody, drums, bass, 120 bpm'}
+function makeWorker(){const code=`(async()=>{const T=await import('https://cdn.jsdelivr.net/npm/@huggingface/transformers@3');let tokenizer,model,loaded=false;self.onmessage=async(e)=>{const d=e.data;if(d.type==='load'){try{self.postMessage({type:'status',msg:'Loading tokenizer...'});tokenizer=await T.AutoTokenizer.from_pretrained('Xenova/musicgen-small');self.postMessage({type:'status',msg:'Loading model (this takes a minute)...'});model=await T.MusicgenForConditionalGeneration.from_pretrained('Xenova/musicgen-small',{dtype:{text_encoder:'q4f16',decoder_model_merged:'q4',encodec_decode:'q4f16'},progress_callback:(p)=>{if(p.status==='progress'&&p.progress!=null)self.postMessage({type:'load-progress',file:p.file||'',pct:Math.round(p.progress)})}});loaded=true;self.postMessage({type:'loaded'})}catch(err){self.postMessage({type:'error',msg:'Model load failed: '+err.message})}}if(d.type==='generate'){try{if(!loaded){self.postMessage({type:'error',msg:'Model not loaded'});return}self.postMessage({type:'status',msg:'Tokenizing...'});const inputs=tokenizer(d.prompt);self.postMessage({type:'status',msg:'Generating audio...'});const mt=d.maxTokens||1000;let tc=0;const audio=await model.generate({...inputs,max_new_tokens:mt,do_sample:true,guidance_scale:3,callback_function:(x)=>{tc++;if(tc%10===0)self.postMessage({type:'gen-progress',pct:Math.min(99,Math.round(tc/mt*100))})}});const sr=model.config.audio_encoder.sampling_rate;const buf=audio.data.slice();self.postMessage({type:'audio',buf:buf.buffer,sr},{transfers:[buf.buffer]})}catch(err){self.postMessage({type:'error',msg:'Generation failed: '+err.message})}}};self.postMessage({type:'worker-ready'})})();`;return new Worker(URL.createObjectURL(new Blob([code],{type:'text/javascript'})))}
+function setStatus(cls,txt){dot.className='dot'+(cls?' '+cls:'');sTxt.textContent=txt}
+let modelLoaded=false;
+genBtn.onclick=()=>{genBtn.disabled=true;progWrap.style.display='block';progFill.style.width='0%';progFill.classList.add('pulse');progTxt.textContent='Initializing...';setStatus('load','Working...');footStatus.textContent='';const prompt=enhance($('prompt').value);const mt=parseInt(durSlider.value)*50;if(!worker){worker=makeWorker();worker.onmessage=handleWorker;worker._pp=prompt;worker._mt=mt}else{worker.postMessage({type:'generate',prompt,maxTokens:mt})}};
+function handleWorker(e){const d=e.data;if(d.type==='worker-ready')worker.postMessage({type:'load'});if(d.type==='status')progTxt.textContent=d.msg;if(d.type==='load-progress'){progTxt.textContent='Downloading '+(d.file?d.file.split('/').pop():'model')+'... '+d.pct+'%';progFill.style.width=Math.min(d.pct,95)+'%'}if(d.type==='loaded'){modelLoaded=true;setStatus('on','Model ready');progFill.style.width='100%';progTxt.textContent='Model loaded — generating...';worker.postMessage({type:'generate',prompt:worker._pp||enhance($('prompt').value),maxTokens:worker._mt||1000})}if(d.type==='gen-progress'){progFill.classList.remove('pulse');progFill.style.width=d.pct+'%';progTxt.textContent='Generating audio... '+d.pct+'%'}if(d.type==='audio'){curAudio=new Float32Array(d.buf);curSR=d.sr;progWrap.style.display='none';progFill.classList.remove('pulse');genBtn.disabled=false;setStatus('on','Ready');showPlayer();drawWave(curAudio);footStatus.textContent='Generated '+(curAudio.length/curSR).toFixed(1)+'s of audio.'}if(d.type==='error'){progTxt.textContent='⚠ '+d.msg;progFill.style.width='0%';progFill.classList.remove('pulse');setStatus('err','Error');genBtn.disabled=false}}
+function getCtx(){if(!actx)actx=new(window.AudioContext||window.webkitAudioContext)();return actx}
+function showPlayer(){playerCard.style.display='block';stopAudio()}
+function stopAudio(){if(srcNode){try{srcNode.stop()}catch(e){}srcNode=null}playing=false;pausedAt=0;startedAt=0;playBtn.textContent='▶';waveCursor.style.left='0px'}
+playBtn.onclick=()=>{if(!curAudio)return;if(playing){pausedAt=getCtx().currentTime-startedAt;srcNode.stop();srcNode=null;playing=false;playBtn.textContent='▶'}else{const ctx=getCtx();const buf=ctx.createBuffer(1,curAudio.length,curSR);buf.getChannelData(0).set(curAudio);srcNode=ctx.createBufferSource();srcNode.buffer=buf;srcNode.connect(ctx.destination);srcNode.onended=()=>{if(playing)stopAudio()};startedAt=ctx.currentTime-pausedAt;srcNode.start(0,pausedAt);playing=true;playBtn.textContent='❚❚';animCursor()}};
+function animCursor(){if(!playing)return;const el=getCtx().currentTime-startedAt;const dur=curAudio.length/curSR;const pct=Math.min(el/dur,1);waveCursor.style.left=(pct*waveCanvas.offsetWidth)+'px';pTime.textContent=fmt(el)+' / '+fmt(dur);if(pct<1)requestAnimationFrame(animCursor)}
+function fmt(s){const m=Math.floor(s/60),sec=Math.floor(s%60);return m+':'+String(sec).padStart(2,'0')}
+function drawWave(data){const c=waveCanvas,ctx=c.getContext('2d');const dpr=window.devicePixelRatio||1;c.width=c.offsetWidth*dpr;c.height=c.offsetHeight*dpr;ctx.scale(dpr,dpr);const w=c.offsetWidth,h=c.offsetHeight;ctx.clearRect(0,0,w,h);const step=Math.ceil(data.length/w);const mid=h/2;ctx.fillStyle='#00ffaa';for(let i=0;i<w;i++){let mn=1,mx=-1;for(let j=0;j<step;j++){const v=data[i*step+j]||0;if(v<mn)mn=v;if(v>mx)mx=v}const top=(1-mx)*mid;const bot=(1-mn)*mid;ctx.globalAlpha=.6+Math.abs(mx-mn)*.4;ctx.fillRect(i,top,1,Math.max(1,bot-top))}ctx.globalAlpha=1}
+$('waveWrap').onclick=(e)=>{if(!curAudio)return;const r=waveCanvas.getBoundingClientRect();const pct=(e.clientX-r.left)/r.width;pausedAt=pct*(curAudio.length/curSR);if(playing){srcNode.stop();srcNode=null;playing=false;playBtn.click()}else{waveCursor.style.left=(pct*waveCanvas.offsetWidth)+'px';pTime.textContent=fmt(pausedAt)+' / '+fmt(curAudio.length/curSR)}};
+function toWav(f,sr){const l=f.length;const b=new ArrayBuffer(44+l*2);const v=new DataView(b);const ws=(o,s)=>{for(let i=0;i<s.length;i++)v.setUint8(o+i,s.charCodeAt(i))};ws(0,'RIFF');v.setUint32(4,36+l*2,true);ws(8,'WAVE');ws(12,'fmt ');v.setUint32(16,16,true);v.setUint16(20,1,true);v.setUint16(22,1,true);v.setUint32(24,sr,true);v.setUint32(28,sr*2,true);v.setUint16(32,2,true);v.setUint16(34,16,true);ws(36,'data');v.setUint32(40,l*2,true);for(let i=0;i<l;i++){const s=Math.max(-1,Math.min(1,f[i]));v.setInt16(44+i*2,s<0?s*0x8000:s*0x7FFF,true)}return new Blob([b],{type:'audio/wav'})}
+function dl(blob,name){const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=name;a.click();URL.revokeObjectURL(a.href)}
+$('dlBtn').onclick=()=>{if(curAudio)dl(toWav(curAudio,curSR),'maximus-'+Date.now()+'.wav')};
+$('saveBtn').onclick=()=>{if(!curAudio)return;const name=$('prompt').value.trim().slice(0,24)||'Clip';clips.push({name,data:curAudio.slice(),sr:curSR,dur:curAudio.length/curSR});renderLib()};
+function renderLib(){libCard.style.display=clips.length?'block':'none';stitchRow.style.display=clips.length>=2?'flex':'none';$('clipCount').textContent='('+clips.length+')';clipsGrid.innerHTML='';clips.forEach((c,i)=>{const d=document.createElement('div');d.className='clip';d.innerHTML='<div class="clip-name">'+esc(c.name)+'</div><div class="clip-dur">'+c.dur.toFixed(1)+'s</div><button class="clip-del" data-i="'+i+'">✕</button>';d.onclick=(e)=>{if(e.target.classList.contains('clip-del')){clips.splice(parseInt(e.target.dataset.i),1);renderLib();return}curAudio=c.data;curSR=c.sr;showPlayer();drawWave(curAudio)};clipsGrid.appendChild(d)})}
+function esc(s){const d=document.createElement('div');d.textContent=s;return d.innerHTML}
+$('stitchBtn').onclick=()=>{if(clips.length<2)return;const sr=clips[0].sr;const fade=Math.floor(.3*sr);let tl=clips.reduce((s,c)=>s+c.data.length,0)-(clips.length-1)*fade;const out=new Float32Array(tl);let pos=0;clips.forEach((c,i)=>{for(let j=0;j<c.data.length;j++){let s=c.data[j];if(i>0&&j<fade)s*=j/fade;if(i<clips.length-1&&j>=c.data.length-fade)s*=(c.data.length-j)/fade;out[pos+j]=(out[pos+j]||0)+s}pos+=c.data.length-fade});stitchedBuf={data:out,sr};curAudio=out;curSR=sr;showPlayer();drawWave(out);footStatus.textContent='Stitched '+clips.length+' clips → '+(out.length/sr).toFixed(1)+'s track.'};
+$('dlStitchBtn').onclick=()=>{if(stitchedBuf)dl(toWav(stitchedBuf.data,stitchedBuf.sr),'maximus-stitched-'+Date.now()+'.wav')};
+window.addEventListener('resize',()=>{if(curAudio)drawWave(curAudio)});
+</script>
 </body>
 </html>
+
