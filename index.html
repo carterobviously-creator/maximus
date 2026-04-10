@@ -2,186 +2,206 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>Maximus Model Host</title>
+  <title>Maximus Lite · Music Generator</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <style>
-    :root {
-      --bg: #05060a;
-      --panel: #0b0d14;
-      --accent: #5cffc9;
-      --accent-soft: rgba(92, 255, 201, 0.15);
-      --text-main: #f5f7ff;
-      --text-soft: #9aa0c2;
-      --border: #1a1d2a;
-    }
-    * { box-sizing: border-box; margin: 0; padding: 0; }
     body {
-      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-      background: radial-gradient(circle at top, #111426 0, #05060a 55%);
-      color: var(--text-main);
-      min-height: 100vh;
+      background: #05060a;
+      color: #e8ecff;
+      font-family: system-ui, sans-serif;
+      padding: 20px;
       display: flex;
-      align-items: center;
       justify-content: center;
-      padding: 24px;
     }
-    .shell {
-      width: 100%;
+    .box {
       max-width: 720px;
-      background: linear-gradient(145deg, #05060a, #090b12);
-      border-radius: 18px;
-      border: 1px solid var(--border);
-      box-shadow:
-        0 0 0 1px rgba(0,0,0,0.6),
-        0 24px 60px rgba(0,0,0,0.85);
-      padding: 20px 22px 18px;
-    }
-    .header {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      margin-bottom: 14px;
-    }
-    .title {
-      font-size: 18px;
-      letter-spacing: 0.08em;
-      text-transform: uppercase;
-      color: var(--text-soft);
-    }
-    .badge {
-      font-size: 11px;
-      padding: 4px 10px;
-      border-radius: 999px;
-      border: 1px solid var(--accent-soft);
-      background: radial-gradient(circle at top left, var(--accent-soft), transparent 60%);
-      color: var(--accent);
-    }
-    .block {
-      margin-top: 10px;
-      padding: 14px 14px 12px;
+      width: 100%;
+      background: #0b0d14;
+      padding: 20px;
       border-radius: 14px;
-      background: rgba(8, 10, 18, 0.9);
-      border: 1px solid var(--border);
+      border: 1px solid #1a1d2a;
     }
-    .block h2 {
-      font-size: 14px;
-      text-transform: uppercase;
-      letter-spacing: 0.12em;
-      color: var(--text-soft);
-      margin-bottom: 8px;
-    }
-    .block p {
-      font-size: 13px;
-      line-height: 1.5;
-      color: var(--text-soft);
-      margin-bottom: 8px;
-    }
-    code {
-      font-family: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
-      font-size: 12px;
-      background: rgba(10, 12, 22, 0.9);
-      padding: 2px 6px;
-      border-radius: 6px;
-      border: 1px solid rgba(92, 255, 201, 0.15);
-      color: var(--accent);
-    }
-    .file-list {
-      margin-top: 6px;
+    h1 { margin-bottom: 6px; }
+    textarea {
+      width: 100%;
+      height: 80px;
+      background: #080a12;
+      border: 1px solid #1a1d2a;
       border-radius: 10px;
-      border: 1px solid var(--border);
-      overflow: hidden;
+      color: #e8ecff;
+      padding: 10px;
+      resize: vertical;
     }
-    .file-row {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      padding: 7px 10px;
-      font-size: 13px;
-      background: rgba(6, 8, 16, 0.9);
-    }
-    .file-row:nth-child(2n) {
-      background: rgba(4, 6, 12, 0.9);
-    }
-    .file-row a {
-      color: var(--text-main);
-      text-decoration: none;
-    }
-    .file-row a:hover {
-      color: var(--accent);
-    }
-    .file-meta {
-      font-size: 11px;
-      color: var(--text-soft);
-    }
-    .footer {
+    select, button {
       margin-top: 10px;
-      font-size: 11px;
-      color: var(--text-soft);
+      padding: 8px 14px;
+      border-radius: 999px;
+      border: none;
+      font-size: 13px;
+    }
+    select {
+      background: #080a12;
+      color: #e8ecff;
+      border: 1px solid #1a1d2a;
+    }
+    button {
+      background: #5cffc9;
+      color: #020308;
+      font-weight: 600;
+      cursor: pointer;
+    }
+    button:disabled {
+      opacity: 0.4;
+      cursor: default;
+    }
+    .row {
       display: flex;
-      justify-content: space-between;
+      gap: 10px;
       align-items: center;
-      opacity: 0.8;
+      margin-top: 8px;
+    }
+    .status {
+      margin-top: 10px;
+      font-size: 12px;
+      color: #9aa0c2;
+      min-height: 18px;
+    }
+    audio {
+      width: 100%;
+      margin-top: 16px;
+    }
+    .tag {
+      font-size: 11px;
+      padding: 2px 8px;
+      border-radius: 999px;
+      border: 1px solid #1a1d2a;
+      background: #080a12;
+      color: #9aa0c2;
     }
   </style>
 </head>
 <body>
-  <main class="shell">
-    <header class="header">
-      <div class="title">Maximus / Model Host</div>
-      <div class="badge">Local‑first · Offline‑ready</div>
-    </header>
+  <div class="box">
+    <h1>Maximus Lite</h1>
+    <div class="tag">32 long songs / day · 4 min max · 30s after limit</div>
 
-    <section class="block">
-      <h2>Riffusion v1.5</h2>
-      <p>
-        This page exposes the Riffusion model files for Maximus. Your local Maximus client
-        can download from these URLs and cache them for fully offline music generation.
-      </p>
-      <p>
-        Base path for this model:
-        <code>/models/riffusion/</code>
-      </p>
+    <p style="margin:10px 0 4px;">Prompt</p>
+    <textarea id="prompt" placeholder="dark synthwave with slow build"></textarea>
 
-      <div class="file-list">
-        <div class="file-row">
-          <div>
-            <a href="models/riffusion/riffusion-model-v1.safetensors">riffusion-model-v1.safetensors</a>
-            <div class="file-meta">Main model weights</div>
-          </div>
-        </div>
-        <div class="file-row">
-          <div>
-            <a href="models/riffusion/model.yaml">model.yaml</a>
-            <div class="file-meta">Model configuration</div>
-          </div>
-        </div>
-        <div class="file-row">
-          <div>
-            <a href="models/riffusion/v1-inference.yaml">v1-inference.yaml</a>
-            <div class="file-meta">Inference settings</div>
-          </div>
-        </div>
+    <div class="row">
+      <div>
+        <span style="font-size:12px;">Duration</span><br>
+        <select id="duration">
+          <option value="30">30 seconds</option>
+          <option value="60">1 minute</option>
+          <option value="120">2 minutes</option>
+          <option value="240" selected>4 minutes (long)</option>
+        </select>
       </div>
-    </section>
+      <div style="flex:1;"></div>
+      <button id="generate">Generate</button>
+    </div>
 
-    <section class="block">
-      <h2>Client integration</h2>
-      <p>
-        A Maximus client can construct URLs like:
-      </p>
-      <p>
-        <code>BASE_URL + "/models/riffusion/riffusion-model-v1.safetensors"</code>
-      </p>
-      <p>
-        On first run, download to a local cache directory (for example
-        <code>./models/riffusion/</code>) and reuse the cached files for all future sessions.
-      </p>
-    </section>
+    <div class="status" id="status"></div>
 
-    <footer class="footer">
-      <span>Maximus · Riffusion core</span>
-      <span>No accounts · No tracking · Just files</span>
-    </footer>
-  </main>
+    <audio id="player" controls style="display:none;"></audio>
+  </div>
+
+  <script>
+    const MAX_LONG_SONGS_PER_DAY = 32;
+    const LONG_THRESHOLD_SECONDS = 60; // anything >= 60s counts as "long" for the limit
+
+    const promptEl = document.getElementById('prompt');
+    const durationEl = document.getElementById('duration');
+    const statusEl = document.getElementById('status');
+    const btn = document.getElementById('generate');
+    const player = document.getElementById('player');
+
+    function todayKey() {
+      const d = new Date();
+      return d.getFullYear() + '-' + (d.getMonth()+1) + '-' + d.getDate();
+    }
+
+    function loadUsage() {
+      const key = todayKey();
+      const raw = localStorage.getItem('maximus_usage');
+      if (!raw) return { date: key, longSongs: 0 };
+      try {
+        const data = JSON.parse(raw);
+        if (data.date !== key) {
+          // new day, reset
+          return { date: key, longSongs: 0 };
+        }
+        return data;
+      } catch {
+        return { date: key, longSongs: 0 };
+      }
+    }
+
+    function saveUsage(usage) {
+      localStorage.setItem('maximus_usage', JSON.stringify(usage));
+    }
+
+    function isRateLimited(usage) {
+      return usage.longSongs >= MAX_LONG_SONGS_PER_DAY;
+    }
+
+    async function generateSong(prompt, seconds) {
+      // TODO: hook up the smaller model here.
+      // For now, this just simulates a delay and returns a fake URL.
+      await new Promise(r => setTimeout(r, 1500));
+      // In the real version, you’d run the tiny model in JS and build a Blob URL.
+      return null; // placeholder
+    }
+
+    async function onGenerate() {
+      const prompt = promptEl.value.trim();
+      if (!prompt) {
+        statusEl.textContent = 'Enter a prompt first.';
+        return;
+      }
+
+      let seconds = parseInt(durationEl.value, 10) || 30;
+      let usage = loadUsage();
+      const limited = isRateLimited(usage);
+
+      if (limited && seconds > 30) {
+        seconds = 30;
+        durationEl.value = '30';
+        statusEl.textContent = 'Daily long-song limit reached. You can only generate 30 second songs until tomorrow.';
+      } else if (!limited && seconds >= LONG_THRESHOLD_SECONDS) {
+        // this will count as a long song
+        usage.longSongs += 1;
+        saveUsage(usage);
+        statusEl.textContent = `Generating long song #${usage.longSongs} of ${MAX_LONG_SONGS_PER_DAY} for today…`;
+      } else if (!limited) {
+        statusEl.textContent = 'Generating short song…';
+      } else {
+        statusEl.textContent = 'Generating 30 second song (rate-limited)…';
+      }
+
+      btn.disabled = true;
+      player.style.display = 'none';
+      player.removeAttribute('src');
+
+      try {
+        const url = await generateSong(prompt, seconds);
+        if (!url) {
+          statusEl.textContent = 'Song generation stubbed. Wire the tiny model into generateSong().';
+          return;
+        }
+        player.src = url;
+        player.style.display = 'block';
+        statusEl.textContent = 'Done.';
+      } catch (e) {
+        console.error(e);
+        statusEl.textContent = 'Failed to generate song.';
+      } finally {
+        btn.disabled = false;
+      }
+    }
+
+    btn.addEventListener('click', onGenerate);
+  </script>
 </body>
 </html>
