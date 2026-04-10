@@ -2,206 +2,109 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>Maximus Lite · Music Generator</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Maximus Lite</title>
   <style>
-    body {
-      background: #05060a;
-      color: #e8ecff;
-      font-family: system-ui, sans-serif;
-      padding: 20px;
-      display: flex;
-      justify-content: center;
-    }
-    .box {
-      max-width: 720px;
-      width: 100%;
-      background: #0b0d14;
-      padding: 20px;
-      border-radius: 14px;
-      border: 1px solid #1a1d2a;
-    }
-    h1 { margin-bottom: 6px; }
-    textarea {
-      width: 100%;
-      height: 80px;
-      background: #080a12;
-      border: 1px solid #1a1d2a;
-      border-radius: 10px;
-      color: #e8ecff;
-      padding: 10px;
-      resize: vertical;
-    }
-    select, button {
-      margin-top: 10px;
-      padding: 8px 14px;
-      border-radius: 999px;
-      border: none;
-      font-size: 13px;
-    }
-    select {
-      background: #080a12;
-      color: #e8ecff;
-      border: 1px solid #1a1d2a;
-    }
-    button {
-      background: #5cffc9;
-      color: #020308;
-      font-weight: 600;
-      cursor: pointer;
-    }
-    button:disabled {
-      opacity: 0.4;
-      cursor: default;
-    }
-    .row {
-      display: flex;
-      gap: 10px;
-      align-items: center;
-      margin-top: 8px;
-    }
-    .status {
-      margin-top: 10px;
-      font-size: 12px;
-      color: #9aa0c2;
-      min-height: 18px;
-    }
-    audio {
-      width: 100%;
-      margin-top: 16px;
-    }
-    .tag {
-      font-size: 11px;
-      padding: 2px 8px;
-      border-radius: 999px;
-      border: 1px solid #1a1d2a;
-      background: #080a12;
-      color: #9aa0c2;
-    }
+    body { background: #0a0a0f; color: #e0e0e0; font-family: monospace; padding: 2rem; }
+    h1 { color: #00ffaa; }
+    input, button { font-size: 1.1rem; padding: 0.5rem 1rem; margin: 0.5rem 0; }
+    input { width: 400px; background: #1a1a2e; color: #fff; border: 1px solid #00ffaa; }
+    button { background: #00ffaa; color: #0a0a0f; border: none; cursor: pointer; }
+    button:disabled { opacity: 0.4; cursor: wait; }
+    #status { color: #888; margin-top: 1rem; white-space: pre-line; }
+    audio { margin-top: 1rem; display: block; }
   </style>
 </head>
 <body>
-  <div class="box">
-    <h1>Maximus Lite</h1>
-    <div class="tag">32 long songs / day · 4 min max · 30s after limit</div>
+  <h1>⚡ Maximus Lite</h1>
+  <p>Browser-only music generator — no servers, no Python, no Node.</p>
+  <input id="prompt" type="text" placeholder="chill lo-fi beat, 90 bpm" />
+  <br>
+  <button id="generate" onclick="generate()">Generate Music</button>
+  <div id="status">Ready. First run downloads ~458 MB model (cached after).</div>
+  <audio id="player" controls style="display:none"></audio>
 
-    <p style="margin:10px 0 4px;">Prompt</p>
-    <textarea id="prompt" placeholder="dark synthwave with slow build"></textarea>
+  <script type="module">
+    import { AutoTokenizer, MusicgenForConditionalGeneration } from
+      'https://cdn.jsdelivr.net/npm/@huggingface/transformers@3';
 
-    <div class="row">
-      <div>
-        <span style="font-size:12px;">Duration</span><br>
-        <select id="duration">
-          <option value="30">30 seconds</option>
-          <option value="60">1 minute</option>
-          <option value="120">2 minutes</option>
-          <option value="240" selected>4 minutes (long)</option>
-        </select>
-      </div>
-      <div style="flex:1;"></div>
-      <button id="generate">Generate</button>
-    </div>
-
-    <div class="status" id="status"></div>
-
-    <audio id="player" controls style="display:none;"></audio>
-  </div>
-
-  <script>
-    const MAX_LONG_SONGS_PER_DAY = 32;
-    const LONG_THRESHOLD_SECONDS = 60; // anything >= 60s counts as "long" for the limit
-
-    const promptEl = document.getElementById('prompt');
-    const durationEl = document.getElementById('duration');
-    const statusEl = document.getElementById('status');
+    let tokenizer, model, loaded = false;
+    const status = document.getElementById('status');
     const btn = document.getElementById('generate');
-    const player = document.getElementById('player');
 
-    function todayKey() {
-      const d = new Date();
-      return d.getFullYear() + '-' + (d.getMonth()+1) + '-' + d.getDate();
-    }
-
-    function loadUsage() {
-      const key = todayKey();
-      const raw = localStorage.getItem('maximus_usage');
-      if (!raw) return { date: key, longSongs: 0 };
-      try {
-        const data = JSON.parse(raw);
-        if (data.date !== key) {
-          // new day, reset
-          return { date: key, longSongs: 0 };
+    async function loadModel() {
+      status.textContent = 'Loading model (~458 MB first time, cached after)...';
+      tokenizer = await AutoTokenizer.from_pretrained('Xenova/musicgen-small');
+      model = await MusicgenForConditionalGeneration.from_pretrained(
+        'Xenova/musicgen-small',
+        {
+          dtype: {
+            text_encoder: 'q4f16',
+            decoder_model_merged: 'q4',
+            encodec_decode: 'q4f16',
+          },
         }
-        return data;
-      } catch {
-        return { date: key, longSongs: 0 };
-      }
+      );
+      loaded = true;
+      status.textContent = 'Model loaded. Ready to generate.';
     }
 
-    function saveUsage(usage) {
-      localStorage.setItem('maximus_usage', JSON.stringify(usage));
-    }
-
-    function isRateLimited(usage) {
-      return usage.longSongs >= MAX_LONG_SONGS_PER_DAY;
-    }
-
-    async function generateSong(prompt, seconds) {
-      // TODO: hook up the smaller model here.
-      // For now, this just simulates a delay and returns a fake URL.
-      await new Promise(r => setTimeout(r, 1500));
-      // In the real version, you’d run the tiny model in JS and build a Blob URL.
-      return null; // placeholder
-    }
-
-    async function onGenerate() {
-      const prompt = promptEl.value.trim();
-      if (!prompt) {
-        statusEl.textContent = 'Enter a prompt first.';
-        return;
-      }
-
-      let seconds = parseInt(durationEl.value, 10) || 30;
-      let usage = loadUsage();
-      const limited = isRateLimited(usage);
-
-      if (limited && seconds > 30) {
-        seconds = 30;
-        durationEl.value = '30';
-        statusEl.textContent = 'Daily long-song limit reached. You can only generate 30 second songs until tomorrow.';
-      } else if (!limited && seconds >= LONG_THRESHOLD_SECONDS) {
-        // this will count as a long song
-        usage.longSongs += 1;
-        saveUsage(usage);
-        statusEl.textContent = `Generating long song #${usage.longSongs} of ${MAX_LONG_SONGS_PER_DAY} for today…`;
-      } else if (!limited) {
-        statusEl.textContent = 'Generating short song…';
-      } else {
-        statusEl.textContent = 'Generating 30 second song (rate-limited)…';
-      }
-
+    window.generate = async function() {
       btn.disabled = true;
-      player.style.display = 'none';
-      player.removeAttribute('src');
-
       try {
-        const url = await generateSong(prompt, seconds);
-        if (!url) {
-          statusEl.textContent = 'Song generation stubbed. Wire the tiny model into generateSong().';
-          return;
-        }
+        if (!loaded) await loadModel();
+
+        const prompt = document.getElementById('prompt').value || 'chill lo-fi beat';
+        status.textContent = 'Generating audio... (30-120 sec)';
+
+        const inputs = tokenizer(prompt);
+        const audio_values = await model.generate({
+          ...inputs,
+          max_new_tokens: 500,
+          do_sample: true,
+          guidance_scale: 3,
+        });
+
+        // Convert to WAV and play
+        const sampleRate = model.config.audio_encoder.sampling_rate;
+        const audioData = audio_values.data;
+        const wavBlob = float32ToWav(audioData, sampleRate);
+        const url = URL.createObjectURL(wavBlob);
+
+        const player = document.getElementById('player');
         player.src = url;
         player.style.display = 'block';
-        statusEl.textContent = 'Done.';
+        player.play();
+        status.textContent = 'Done! Playing audio.';
       } catch (e) {
+        status.textContent = 'Error: ' + e.message;
         console.error(e);
-        statusEl.textContent = 'Failed to generate song.';
-      } finally {
-        btn.disabled = false;
       }
-    }
+      btn.disabled = false;
+    };
 
-    btn.addEventListener('click', onGenerate);
+    function float32ToWav(float32Array, sampleRate) {
+      const buffer = new ArrayBuffer(44 + float32Array.length * 2);
+      const view = new DataView(buffer);
+      const writeStr = (o, s) => { for (let i = 0; i < s.length; i++) view.setUint8(o + i, s.charCodeAt(i)); };
+      writeStr(0, 'RIFF');
+      view.setUint32(4, 36 + float32Array.length * 2, true);
+      writeStr(8, 'WAVE');
+      writeStr(12, 'fmt ');
+      view.setUint32(16, 16, true);
+      view.setUint16(20, 1, true);
+      view.setUint16(22, 1, true);
+      view.setUint32(24, sampleRate, true);
+      view.setUint32(28, sampleRate * 2, true);
+      view.setUint16(32, 2, true);
+      view.setUint16(34, 16, true);
+      writeStr(36, 'data');
+      view.setUint32(40, float32Array.length * 2, true);
+      for (let i = 0; i < float32Array.length; i++) {
+        const s = Math.max(-1, Math.min(1, float32Array[i]));
+        view.setInt16(44 + i * 2, s < 0 ? s * 0x8000 : s * 0x7FFF, true);
+      }
+      return new Blob([buffer], { type: 'audio/wav' });
+    }
   </script>
 </body>
 </html>
