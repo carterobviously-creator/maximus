@@ -122,7 +122,7 @@
 
       try {
         pipe = await pipeline("text-to-audio", "Xenova/musicgen-small", {
-          device: "webgpu", // will fall back internally if not available
+          device: "webgpu", // falls back internally if not available
         });
         setStatus("Model ready. Enter a prompt and generate a track.");
       } catch (err) {
@@ -230,4 +230,3 @@
   </script>
 </body>
 </html>
-
