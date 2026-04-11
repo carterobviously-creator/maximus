@@ -66,6 +66,23 @@
             border-radius: 50%;
             animation: spin 0.8s linear infinite;
         }
+
+        input[type=range] {
+            accent-color: var(--neon-blue);
+        }
+
+        .queue-item {
+            animation: slideIn 0.3s ease-out;
+        }
+
+        @keyframes slideIn {
+            from { opacity: 0; transform: translateX(-10px); }
+            to { opacity: 1; transform: translateX(0); }
+        }
+
+        ::-webkit-scrollbar { width: 4px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.1); border-radius: 10px; }
     </style>
 </head>
 <body class="flex flex-col p-6 lg:p-10">
@@ -75,7 +92,7 @@
             <h1 class="text-4xl header-font font-bold tracking-tighter neon-text">SONIC<span class="text-[#bc13fe]">PRO</span></h1>
             <div class="flex items-center gap-2 mt-1">
                 <span class="w-1.5 h-1.5 rounded-full bg-cyan-400 animate-pulse"></span>
-                <span class="text-[10px] uppercase tracking-[0.5em] text-white/40">Neural Generation Core</span>
+                <span class="text-[10px] uppercase tracking-[0.5em] text-white/40">Batch Production Engine</span>
             </div>
         </div>
         
@@ -92,36 +109,47 @@
     </header>
 
     <main class="flex-1 flex flex-col lg:flex-row gap-8 overflow-hidden">
-        <aside class="w-full lg:w-[400px] flex flex-col gap-6">
-            <div class="glass p-8 flex flex-col gap-8 flex-1">
+        <aside class="w-full lg:w-[400px] flex flex-col gap-6 overflow-hidden">
+            <div class="glass p-8 flex flex-col gap-6 shrink-0">
                 <div>
-                    <label class="text-[10px] font-bold uppercase text-cyan-400 tracking-widest mb-4 block">1. Describe Music</label>
-                    <textarea id="prompt-input" class="w-full bg-black/40 border border-white/10 rounded-2xl p-5 text-sm h-32 resize-none focus:outline-none focus:border-cyan-500 transition leading-relaxed" placeholder="e.g. 80s synthwave with analog pads and a driving bassline, 120bpm, neon atmosphere...">Cyberpunk cinematic dark synth, heavy analog bass, rhythmic digital textures, 100bpm, high fidelity</textarea>
-                    <div class="flex flex-wrap gap-2 mt-3">
-                        <button onclick="setExample('Hard techno beat with a heavy 909 kick, industrial warehouse vibe, dark, 140bpm')" class="text-[9px] px-2 py-1 bg-white/5 rounded border border-white/10 hover:border-cyan-400 text-white/60">Techno</button>
-                        <button onclick="setExample('Uplifting house music with a groovy bassline and piano chords, 126bpm')" class="text-[9px] px-2 py-1 bg-white/5 rounded border border-white/10 hover:border-cyan-400 text-white/60">House</button>
-                        <button onclick="setExample('Lofi hip hop drum beat with a dusty jazz piano melody, vinyl crackle, 90bpm')" class="text-[9px] px-2 py-1 bg-white/5 rounded border border-white/10 hover:border-cyan-400 text-white/60">Lofi</button>
-                    </div>
+                    <label class="text-[10px] font-bold uppercase text-cyan-400 tracking-widest mb-3 block">1. Describe Music</label>
+                    <textarea id="prompt-input" class="w-full bg-black/40 border border-white/10 rounded-2xl p-5 text-sm h-24 resize-none focus:outline-none focus:border-cyan-500 transition leading-relaxed" placeholder="e.g. 80s synthwave with analog pads...">Dark industrial techno, distorted kick, 135bpm</textarea>
                 </div>
 
-                <div class="flex-1">
-                    <label class="text-[10px] font-bold uppercase text-cyan-400 tracking-widest mb-4 block">2. Model Status</label>
-                    <div id="status-box" class="bg-black/20 rounded-xl p-4 border border-white/5 space-y-3">
-                        <div class="flex justify-between items-center">
-                            <span id="status-text" class="text-[9px] uppercase tracking-widest text-white/40">Ready to Load</span>
-                            <div id="spinner" class="loading-spinner hidden"></div>
-                        </div>
-                        <div id="progress-container" class="hidden w-full h-1 bg-white/5 rounded-full overflow-hidden">
-                            <div id="progress-bar" class="h-full bg-cyan-400 w-0 transition-all duration-300"></div>
-                        </div>
+                <div>
+                    <div class="flex justify-between items-center mb-3">
+                        <label class="text-[10px] font-bold uppercase text-cyan-400 tracking-widest">2. Arrangement Length</label>
+                        <span id="length-display" class="text-[10px] font-bold text-white/60">60s</span>
                     </div>
+                    <input type="range" id="duration-slider" min="20" max="180" step="10" value="60" oninput="updateLengthDisplay(this.value)" class="w-full h-1 bg-white/10 rounded-lg appearance-none cursor-pointer">
                 </div>
 
-                <div class="pt-6">
-                    <button id="gen-btn" onclick="generate()" class="btn-primary w-full py-6 rounded-2xl flex items-center justify-center gap-4">
-                        <span id="gen-text">Generate Music</span>
+                <div class="pt-2">
+                    <button id="add-queue-btn" onclick="addToQueue()" class="btn-primary w-full py-4 rounded-2xl flex items-center justify-center gap-4">
+                        <i data-lucide="plus-circle" class="w-5 h-5"></i>
+                        <span>Add to Queue</span>
                     </button>
-                    <p class="text-[9px] text-center mt-4 text-white/20 uppercase tracking-widest italic">Note: Full generation (~10s) takes 2-4 minutes on most browsers.</p>
+                </div>
+            </div>
+
+            <!-- Queue System -->
+            <div class="glass flex-1 p-6 flex flex-col overflow-hidden">
+                <div class="flex justify-between items-center mb-4">
+                    <label class="text-[10px] font-bold uppercase text-white/40 tracking-widest">Production Queue</label>
+                    <span id="queue-count" class="text-[10px] bg-white/10 px-2 py-0.5 rounded-full text-white/60">0 Items</span>
+                </div>
+                <div id="queue-list" class="flex-1 overflow-y-auto space-y-3 pr-2">
+                    <!-- Queue items injected here -->
+                    <div class="text-center py-10 opacity-20 text-xs italic">Queue is empty</div>
+                </div>
+                <div id="batch-status" class="mt-4 pt-4 border-t border-white/5 hidden">
+                    <div class="flex justify-between items-center mb-2">
+                        <span id="status-text" class="text-[9px] uppercase tracking-widest text-cyan-400">Processing...</span>
+                        <div id="spinner" class="loading-spinner"></div>
+                    </div>
+                    <div id="progress-container" class="w-full h-1 bg-white/5 rounded-full overflow-hidden">
+                        <div id="progress-bar" class="h-full bg-cyan-400 w-0 transition-all duration-300"></div>
+                    </div>
                 </div>
             </div>
         </aside>
@@ -132,6 +160,13 @@
             <div id="main-display" class="text-center transition-all duration-500 opacity-40">
                 <h2 id="display-title" class="text-7xl font-bold header-font tracking-tighter italic uppercase">Standby</h2>
                 <p id="display-subtitle" class="text-xs uppercase tracking-[0.8em] text-cyan-400 mt-6 font-bold">Neural Engine Offline</p>
+                <div id="playhead-container" class="hidden mt-8 w-64 h-1 bg-white/10 mx-auto rounded-full overflow-hidden">
+                    <div id="playhead" class="h-full bg-cyan-400 w-0"></div>
+                </div>
+            </div>
+            
+            <div id="completion-list" class="absolute bottom-8 left-8 right-8 flex gap-4 overflow-x-auto pb-4">
+                <!-- Completed tracks appear here as quick-switches -->
             </div>
         </section>
     </main>
@@ -145,15 +180,22 @@
 
         lucide.createIcons();
 
-        // Environment Config
         env.allowLocalModels = false;
         env.useBrowserCache = true;
+        env.backends.onnx.wasm.numThreads = Math.min(navigator.hardwareConcurrency || 4, 8); 
         
         let tokenizer = null;
         let model = null;
-        let audioCtx, analyser, masterBuffer, sourceNode, isPlaying = false;
+        let audioCtx, analyser, currentSourceNode, isPlaying = false;
+        
+        // Batch State
+        let queue = [];
+        let completedTracks = [];
+        let isProcessing = false;
+        let currentTargetDuration = 60;
+        let activeTrackIndex = -1;
 
-        // Visualizer Setup
+        // UI setup
         const viz = document.getElementById('viz-container');
         for(let i=0; i<32; i++) {
             const bar = document.createElement('div');
@@ -162,120 +204,213 @@
             viz.appendChild(bar);
         }
 
-        window.setExample = (val) => {
-            document.getElementById('prompt-input').value = val;
+        window.updateLengthDisplay = (val) => {
+            currentTargetDuration = parseInt(val);
+            document.getElementById('length-display').innerText = val + 's';
         };
 
-        window.generate = async () => {
+        window.addToQueue = () => {
             const prompt = document.getElementById('prompt-input').value;
             if (!prompt) return;
 
-            const genBtn = document.getElementById('gen-btn');
+            const item = {
+                id: Date.now(),
+                prompt,
+                duration: currentTargetDuration,
+                status: 'pending'
+            };
+
+            queue.push(item);
+            renderQueue();
+            processQueue();
+        };
+
+        function renderQueue() {
+            const list = document.getElementById('queue-list');
+            const count = document.getElementById('queue-count');
+            count.innerText = `${queue.length} Item${queue.length === 1 ? '' : 's'}`;
+
+            if (queue.length === 0) {
+                list.innerHTML = `<div class="text-center py-10 opacity-20 text-xs italic">Queue is empty</div>`;
+                return;
+            }
+
+            list.innerHTML = queue.map((item, idx) => `
+                <div class="queue-item glass p-4 bg-white/5 border-white/10 flex flex-col gap-2 ${item.status === 'processing' ? 'border-cyan-500/50' : ''}">
+                    <div class="flex justify-between items-start">
+                        <span class="text-[10px] font-bold text-white/40 tracking-widest uppercase">Task #${idx + 1}</span>
+                        <span class="text-[9px] px-2 py-0.5 rounded bg-white/5 text-white/60 font-mono">${item.duration}s</span>
+                    </div>
+                    <p class="text-xs text-white/80 line-clamp-1">${item.prompt}</p>
+                    <div class="flex items-center gap-2">
+                        <span class="text-[8px] uppercase tracking-tighter ${item.status === 'processing' ? 'text-cyan-400 animate-pulse' : 'text-white/20'}">${item.status}</span>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        async function processQueue() {
+            if (isProcessing || queue.length === 0) return;
+
+            isProcessing = true;
+            document.getElementById('batch-status').classList.remove('hidden');
+            
+            const task = queue[0];
+            task.status = 'processing';
+            renderQueue();
+
+            try {
+                await generateMusic(task);
+                // On success, move to completed
+                completedTracks.push({...task, status: 'ready'});
+                queue.shift();
+                renderCompleted();
+            } catch (err) {
+                console.error("Batch Error:", err);
+                task.status = 'error';
+            }
+
+            isProcessing = false;
+            if (queue.length > 0) {
+                processQueue();
+            } else {
+                document.getElementById('batch-status').classList.add('hidden');
+            }
+            renderQueue();
+        }
+
+        async function generateMusic(task) {
             const statusText = document.getElementById('status-text');
             const subTitle = document.getElementById('display-subtitle');
             
-            genBtn.disabled = true;
-            document.getElementById('spinner').classList.remove('hidden');
-            document.getElementById('display-title').innerText = "Synthesizing";
-            
             try {
                 if (!model || !tokenizer) {
-                    statusText.innerText = "Loading AI Core...";
+                    statusText.innerText = "Initializing Core...";
                     tokenizer = await AutoTokenizer.from_pretrained('Xenova/musicgen-small');
-                    
-                    statusText.innerText = "Downloading Neural Weights...";
                     model = await MusicgenForConditionalGeneration.from_pretrained('Xenova/musicgen-small', {
                         progress_callback: (p) => {
                             if (p.status === 'progress') {
-                                document.getElementById('progress-container').classList.remove('hidden');
                                 const pct = (p.loaded / p.total) * 100;
                                 document.getElementById('progress-bar').style.width = pct + '%';
-                                statusText.innerText = `Loading Weights: ${Math.round(pct)}%`;
+                                statusText.innerText = `Syncing: ${Math.round(pct)}%`;
                             }
                         }
                     });
                 }
 
-                statusText.innerText = "Inference Running (Large Buffer)...";
-                subTitle.innerText = "This will take a moment - Rendering actual beats...";
+                statusText.innerText = "Neural Rendering...";
+                const inputs = tokenizer(task.prompt, { padding: true, truncation: true, return_tensors: 'pt' });
 
-                // Tokenize text prompt
-                const inputs = tokenizer(prompt, { padding: true, truncation: true, return_tensors: 'pt' });
-
-                // Generate audio tokens
-                // CHANGED: max_new_tokens increased from 150 to 1000 (~10-15 seconds of audio)
-                // CHANGED: guidance_scale added to make the model follow the prompt more strictly
                 const audio_values = await model.generate({
                     inputs: inputs.input_ids,
                     attention_mask: inputs.attention_mask,
-                    max_new_tokens: 1000, 
+                    max_new_tokens: 800,
                     do_sample: true,
                     guidance_scale: 3.5
                 });
 
-                // Decode audio values
-                const audioData = audio_values.data;
                 const samplingRate = model.config.audio_encoder.sampling_rate;
-
-                finalizeAudio(audioData, samplingRate);
+                statusText.innerText = "Finalizing WAV...";
+                
+                task.buffer = await createExtendedBuffer(audio_values.data, samplingRate, task.duration);
+                
+                if (activeTrackIndex === -1) {
+                    selectTrack(completedTracks.length); // Select the one we just finished
+                }
 
             } catch (err) {
-                console.error("Neural Error Detail:", err);
-                statusText.innerText = "Generation Failed.";
-                subTitle.innerText = "Error: " + err.message;
-                resetUI();
+                throw err;
+            }
+        }
+
+        async function createExtendedBuffer(rawAudio, sampleRate, totalSeconds) {
+            if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+            const stem = audioCtx.createBuffer(1, rawAudio.length, sampleRate);
+            stem.getChannelData(0).set(rawAudio);
+
+            const offline = new OfflineAudioContext(1, sampleRate * totalSeconds, sampleRate);
+            const source = offline.createBufferSource();
+            source.buffer = stem;
+            source.loop = true;
+
+            const gainNode = offline.createGain();
+            const filterNode = offline.createBiquadFilter();
+            filterNode.type = 'lowpass';
+            source.connect(filterNode);
+            filterNode.connect(gainNode);
+            gainNode.connect(offline.destination);
+
+            filterNode.frequency.setValueAtTime(400, 0);
+            filterNode.frequency.exponentialRampToValueAtTime(20000, 5);
+            gainNode.gain.setValueAtTime(1, totalSeconds - 3);
+            gainNode.gain.linearRampToValueAtTime(0, totalSeconds);
+
+            source.start(0);
+            return await offline.startRendering();
+        }
+
+        function renderCompleted() {
+            const container = document.getElementById('completion-list');
+            container.innerHTML = completedTracks.map((t, idx) => `
+                <button onclick="window.selectTrack(${idx})" class="glass shrink-0 p-4 min-w-[140px] border-white/10 hover:border-cyan-400 transition text-left group ${activeTrackIndex === idx ? 'border-cyan-500 bg-cyan-500/10' : ''}">
+                    <div class="flex justify-between items-center mb-1">
+                        <span class="text-[8px] font-bold text-cyan-400 uppercase">Track ${idx + 1}</span>
+                        <i data-lucide="music" class="w-3 h-3 text-white/20 group-hover:text-cyan-400"></i>
+                    </div>
+                    <p class="text-[10px] text-white/80 line-clamp-1 font-bold">${t.prompt}</p>
+                </button>
+            `).join('');
+            lucide.createIcons();
+        }
+
+        window.selectTrack = (idx) => {
+            if (completedTracks[idx]) {
+                activeTrackIndex = idx;
+                const track = completedTracks[idx];
+                
+                // Stop current
+                if (isPlaying) togglePlayback();
+                
+                // Setup UI
+                document.getElementById('play-btn').disabled = false;
+                document.getElementById('play-btn').classList.remove('opacity-30', 'cursor-not-allowed');
+                document.getElementById('display-title').innerText = "Neural Master";
+                document.getElementById('display-subtitle').innerText = `${track.duration}s Production Available`;
+                document.getElementById('main-display').classList.remove('opacity-40');
+                document.getElementById('playhead-container').classList.remove('hidden');
+                document.getElementById('download-btn').classList.remove('hidden');
+                
+                renderCompleted();
             }
         };
 
-        function finalizeAudio(audioData, rate) {
-            if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-            
-            const raw = new Float32Array(audioData);
-            masterBuffer = audioCtx.createBuffer(1, raw.length, rate);
-            masterBuffer.getChannelData(0).set(raw);
-
-            document.getElementById('gen-btn').disabled = false;
-            document.getElementById('spinner').classList.add('hidden');
-            document.getElementById('play-btn').disabled = false;
-            document.getElementById('play-btn').classList.remove('opacity-30', 'cursor-not-allowed');
-            document.getElementById('display-title').innerText = "Track Finalized";
-            document.getElementById('main-display').classList.remove('opacity-40');
-            document.getElementById('play-text').innerText = "Play Arrangement";
-            document.getElementById('download-btn').classList.remove('hidden');
-            document.getElementById('status-text').innerText = "Inference Successful";
-            document.getElementById('progress-container').classList.add('hidden');
-            document.getElementById('display-subtitle').innerText = "Audio Master Ready";
-        }
-
-        function resetUI() {
-            document.getElementById('gen-btn').disabled = false;
-            document.getElementById('spinner').classList.add('hidden');
-            document.getElementById('display-title').innerText = "Idle";
-            document.getElementById('progress-container').classList.add('hidden');
-        }
-
         window.togglePlayback = () => {
+            if (activeTrackIndex === -1) return;
+            const track = completedTracks[activeTrackIndex];
+
             if (isPlaying) {
-                if (sourceNode) sourceNode.stop();
+                if (currentSourceNode) currentSourceNode.stop();
                 isPlaying = false;
             } else {
                 if (audioCtx.state === 'suspended') audioCtx.resume();
                 analyser = audioCtx.createAnalyser();
-                sourceNode = audioCtx.createBufferSource();
-                sourceNode.buffer = masterBuffer;
-                sourceNode.loop = true;
-                sourceNode.connect(analyser);
+                currentSourceNode = audioCtx.createBufferSource();
+                currentSourceNode.buffer = track.buffer;
+                currentSourceNode.loop = true;
+                currentSourceNode.connect(analyser);
                 analyser.connect(audioCtx.destination);
-                sourceNode.start(0);
+                
+                const startTime = audioCtx.currentTime;
+                currentSourceNode.start(0);
                 isPlaying = true;
-                updateFrame();
+                updateFrame(startTime, track.duration);
             }
             document.getElementById('play-icon').setAttribute('data-lucide', isPlaying ? 'square' : 'play');
             document.getElementById('play-text').innerText = isPlaying ? "Stop Audio" : "Play Arrangement";
             lucide.createIcons();
         };
 
-        function updateFrame() {
+        function updateFrame(startTime, duration) {
             if (!isPlaying) return;
             const data = new Uint8Array(analyser.frequencyBinCount);
             analyser.getByteFrequencyData(data);
@@ -283,11 +418,15 @@
                 const val = (data[i * 4] / 255) * 240;
                 b.style.height = Math.max(8, val) + 'px';
             });
-            requestAnimationFrame(updateFrame);
+            const elapsed = audioCtx.currentTime - startTime;
+            const progress = (elapsed % duration) / duration * 100;
+            document.getElementById('playhead').style.width = progress + '%';
+            requestAnimationFrame(() => updateFrame(startTime, duration));
         }
 
         window.exportWav = () => {
-            const buffer = masterBuffer;
+            if (activeTrackIndex === -1) return;
+            const buffer = completedTracks[activeTrackIndex].buffer;
             const length = buffer.length * 2 + 44;
             const out = new ArrayBuffer(length);
             const view = new DataView(out);
@@ -302,10 +441,12 @@
                 let s = Math.max(-1, Math.min(1, chan[i]));
                 view.setInt16(offset, s < 0 ? s * 0x8000 : s * 0x7FFF, true);
             }
+            const blob = new Blob([out], { type: 'audio/wav' });
             const link = document.createElement('a');
-            link.href = URL.createObjectURL(new Blob([out], { type: 'audio/wav' }));
-            link.download = "SONIC_PRO_MASTER.wav";
+            link.href = URL.createObjectURL(blob);
+            link.download = `SONIC_PRO_MASTER_${activeTrackIndex + 1}.wav`;
             link.click();
         };
     </script>
 </body>
+</html>
