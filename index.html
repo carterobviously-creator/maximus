@@ -83,7 +83,7 @@
                     <div class="timeline-container" id="timeline"></div>
                     <div class="flex justify-between mt-2 px-1">
                         <span class="text-[10px] text-white/40" id="current-duration">0:00</span>
-                        <span class="text-[10px] text-white/40">3:00 Target</span>
+                        <span class="text-[10px] text-white/40">3:00+ Target</span>
                     </div>
                 </section>
             </div>
@@ -159,7 +159,14 @@
             document.getElementById('download-btn').classList.add('hidden');
 
             const prompt = document.getElementById('prompt-input').value || "Upbeat electronic music";
-            const totalPatterns = 8;
+            
+            // To reach 3 minutes (180s) at 120BPM:
+            // 120 BPM means 2 beats per second.
+            // 180 seconds = 360 beats.
+            // Each pattern is 32 beats long.
+            // 360 / 32 = 11.25. 
+            // We'll generate 12 patterns to ensure it covers 3 minutes (total ~192 seconds).
+            const totalPatterns = 12;
 
             for (let i = 0; i < totalPatterns; i++) {
                 try {
@@ -183,7 +190,7 @@
 
             setLoading(false);
             isComposing = false;
-            updateStatus("Full Composition Ready");
+            updateStatus("Full 3-Min Composition Ready");
             document.getElementById('main-display').innerText = "TRACK READY";
             document.getElementById('download-btn').classList.remove('hidden');
         }
@@ -199,30 +206,43 @@
             Notes use scientific notation (e.g., C2, G3, A#4). 'time' is in beats (0 to 32). Bass should be rhythmic. Lead should be melodic. Duration in beats.`;
 
             const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${apiKey}`;
-            const response = await fetch(url, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    contents: [{ parts: [{ text: `Generate a pattern for: ${userPrompt}. This is segment ${index} of the song.` }] }],
-                    systemInstruction: { parts: [{ text: systemPrompt }] },
-                    generationConfig: { 
-                        responseMimeType: "application/json"
+            
+            const fetchWithRetry = async (retries = 5, delay = 1000) => {
+                try {
+                    const response = await fetch(url, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            contents: [{ parts: [{ text: `Generate a pattern for: ${userPrompt}. This is segment ${index} of the song. Be creative with the progression.` }] }],
+                            systemInstruction: { parts: [{ text: systemPrompt }] },
+                            generationConfig: { 
+                                responseMimeType: "application/json"
+                            }
+                        })
+                    });
+                    if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+                    return await response.json();
+                } catch (err) {
+                    if (retries > 0) {
+                        await new Promise(r => setTimeout(r, delay));
+                        return fetchWithRetry(retries - 1, delay * 2);
                     }
-                })
-            });
+                    throw err;
+                }
+            };
 
-            const result = await response.json();
+            const result = await fetchWithRetry();
             const rawText = result.candidates[0].content.parts[0].text;
             
-            // Robust JSON extraction using regex to handle trailing markdown or commentary
             const jsonMatch = rawText.match(/\{[\s\S]*\}/);
-            if (!jsonMatch) throw new Error("No JSON object found in AI response");
+            if (!jsonMatch) throw new Error("No valid JSON pattern found in engine response");
             
             try {
-                return JSON.parse(jsonMatch[0]);
+                const cleanedJson = jsonMatch[0].trim();
+                return JSON.parse(cleanedJson);
             } catch (err) {
-                console.error("JSON Parse Error on text:", jsonMatch[0]);
-                throw err;
+                console.error("JSON Parse Error on source text:", jsonMatch[0]);
+                throw new Error("Pattern synthesis failed due to malformed data.");
             }
         }
 
@@ -374,8 +394,10 @@
         }
 
         async function exportToWav() {
-            updateStatus("Rendering WAV...");
-            const offlineCtx = new OfflineAudioContext(1, 44100 * 180, 44100); // 3 mins at 44.1k
+            updateStatus("Rendering 3-Min WAV...");
+            // Use total length of all patterns for the buffer
+            const totalDuration = songData.length * 32 * (60 / bpm);
+            const offlineCtx = new OfflineAudioContext(1, 44100 * totalDuration, 44100);
             const beatDuration = 60 / bpm;
 
             songData.forEach((pattern, pIdx) => {
@@ -415,7 +437,7 @@
             const url = URL.createObjectURL(blob);
             const a = document.createElement('a');
             a.href = url;
-            a.download = "sonic-pro-master.wav";
+            a.download = "sonic-pro-full-master.wav";
             a.click();
             updateStatus("Export Complete");
         }
@@ -440,7 +462,7 @@
         function setLoading(l) {
             document.getElementById('loader').classList.toggle('hidden', !l);
             document.getElementById('btn-generate').disabled = l;
-            document.getElementById('gen-btn-text').innerText = l ? "Sequencing..." : "Generate Full Track";
+            document.getElementById('gen-btn-text').innerText = l ? "Synthesizing full track..." : "Generate Full Track";
         }
 
         function updateStatus(m) { document.getElementById('status-text').innerText = m; }
