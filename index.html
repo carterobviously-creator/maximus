@@ -82,7 +82,7 @@
             <h1 class="text-4xl header-font font-bold tracking-tighter neon-text">SONIC<span class="text-[#bc13fe]">PRO</span></h1>
             <div class="flex items-center gap-2 mt-1">
                 <span class="w-1.5 h-1.5 rounded-full bg-emerald-400"></span>
-                <span class="text-[10px] uppercase tracking-[0.5em] text-white/40">Worker Thread Enabled</span>
+                <span class="text-[10px] uppercase tracking-[0.5em] text-white/40">Neural Crossfade Enabled</span>
             </div>
         </div>
         
@@ -109,14 +109,14 @@
                 <div>
                     <div class="flex justify-between items-center mb-3">
                         <label class="text-[10px] font-bold uppercase text-cyan-400 tracking-widest">Target Duration</label>
-                        <span id="length-display" class="text-[10px] font-bold text-white/60">60s</span>
+                        <span id="length-display" class="text-[10px] font-bold text-white/60">30s</span>
                     </div>
-                    <input type="range" id="duration-slider" min="10" max="120" step="10" value="60" oninput="updateLengthDisplay(this.value)" class="w-full h-1 bg-white/10 rounded-lg appearance-none cursor-pointer">
+                    <input type="range" id="duration-slider" min="10" max="60" step="10" value="30" oninput="updateLengthDisplay(this.value)" class="w-full h-1 bg-white/10 rounded-lg appearance-none cursor-pointer">
                 </div>
 
                 <button id="add-queue-btn" onclick="addToQueue()" class="btn-primary w-full py-4 rounded-2xl flex items-center justify-center gap-4">
                     <i data-lucide="plus-circle" class="w-5 h-5"></i>
-                    <span>Queue Track</span>
+                    <span>Queue Full Song</span>
                 </button>
             </div>
 
@@ -145,7 +145,7 @@
 
             <div id="main-display" class="text-center transition-all duration-500 opacity-40">
                 <h2 id="display-title" class="text-7xl font-bold header-font tracking-tighter italic uppercase">Standby</h2>
-                <p id="display-subtitle" class="text-xs uppercase tracking-[0.8em] text-cyan-400 mt-6 font-bold">Background Worker Active</p>
+                <p id="display-subtitle" class="text-xs uppercase tracking-[0.8em] text-cyan-400 mt-6 font-bold">Evolutionary Rendering Active</p>
                 <div id="playhead-container" class="hidden mt-8 w-64 h-1 bg-white/10 mx-auto rounded-full overflow-hidden">
                     <div id="playhead" class="h-full bg-cyan-400 w-0"></div>
                 </div>
@@ -173,19 +173,30 @@
                     });
                 }
 
-                self.postMessage({ type: 'status', data: 'Rendering Audio...' });
-                const inputs = tokenizer(task.prompt, { padding: true, truncation: true, return_tensors: 'pt' });
-                const audio_values = await model.generate({
-                    inputs: inputs.input_ids,
-                    attention_mask: inputs.attention_mask,
-                    max_new_tokens: 512, // Reduced for stability
-                    do_sample: true
-                });
+                // Chunked generation for continuity
+                // Each chunk is roughly 10s. We need enough chunks to cover 'duration'
+                const chunksNeeded = Math.ceil(task.duration / 8); 
+                let fullAudioData = [];
+                const sampleRate = model.config.audio_encoder.sampling_rate;
+
+                for (let i = 0; i < chunksNeeded; i++) {
+                    self.postMessage({ type: 'status', data: `Rendering Chunk ${i+1}/${chunksNeeded}...` });
+                    
+                    const inputs = tokenizer(task.prompt, { padding: true, truncation: true, return_tensors: 'pt' });
+                    const audio_values = await model.generate({
+                        inputs: inputs.input_ids,
+                        attention_mask: inputs.attention_mask,
+                        max_new_tokens: 1024, // Increased for a more cohesive phrase per chunk
+                        do_sample: true
+                    });
+                    
+                    fullAudioData.push(audio_values.data);
+                }
 
                 self.postMessage({ 
                     type: 'success', 
-                    audio: audio_values.data,
-                    sampleRate: model.config.audio_encoder.sampling_rate,
+                    audioChunks: fullAudioData,
+                    sampleRate: sampleRate,
                     taskId: task.id
                 });
             } catch (err) {
@@ -204,19 +215,18 @@
         let activeTrackIndex = -1;
         let audioCtx, analyser, currentSourceNode, isPlaying = false;
 
-        // Initialize Web Worker
         const blob = new Blob([document.getElementById('worker-script').textContent], { type: 'text/javascript' });
         worker = new Worker(URL.createObjectURL(blob), { type: 'module' });
 
         worker.onmessage = (e) => {
-            const { type, data, audio, sampleRate, taskId } = e.data;
+            const { type, data, audioChunks, sampleRate, taskId } = e.data;
             
             if (type === 'progress') {
                 document.getElementById('progress-bar').style.width = data + '%';
             } else if (type === 'status') {
                 document.getElementById('status-text').innerText = data;
             } else if (type === 'success') {
-                handleGenerationSuccess(audio, sampleRate, taskId);
+                handleGenerationSuccess(audioChunks, sampleRate, taskId);
             } else if (type === 'error') {
                 console.error("Worker Error:", data);
                 isProcessing = false;
@@ -224,7 +234,6 @@
             }
         };
 
-        // UI bars
         const viz = document.getElementById('viz-container');
         for(let i=0; i<32; i++) {
             const bar = document.createElement('div');
@@ -276,24 +285,61 @@
             worker.postMessage({ task });
         }
 
-        async function handleGenerationSuccess(audioData, sampleRate, taskId) {
+        async function handleGenerationSuccess(audioChunks, sampleRate, taskId) {
             const task = queue.find(t => t.id === taskId);
             if (!task) return;
 
             if (!audioCtx) audioCtx = new AudioContext();
             
-            // Loop/Extend audio in background (this is fast)
-            const stem = audioCtx.createBuffer(1, audioData.length, sampleRate);
-            stem.getChannelData(0).set(audioData);
+            // Cross-fading logic: stitch chunks with overlap
+            const chunkBuffers = audioChunks.map(chunk => {
+                const b = audioCtx.createBuffer(1, chunk.length, sampleRate);
+                b.getChannelData(0).set(chunk);
+                return b;
+            });
 
-            const offline = new OfflineAudioContext(1, sampleRate * task.duration, sampleRate);
-            const source = offline.createBufferSource();
-            source.buffer = stem;
-            source.loop = true;
-            source.connect(offline.destination);
-            source.start(0);
+            // Calculate total length with overlaps (2 second overlap)
+            const overlapSecs = 2.5;
+            const overlapSamples = Math.floor(overlapSecs * sampleRate);
             
+            let totalLength = 0;
+            chunkBuffers.forEach((buf, i) => {
+                if (i === 0) totalLength += buf.length;
+                else totalLength += (buf.length - overlapSamples);
+            });
+
+            const offline = new OfflineAudioContext(1, totalLength, sampleRate);
+            let currentTime = 0;
+
+            chunkBuffers.forEach((buf, i) => {
+                const source = offline.createBufferSource();
+                source.buffer = buf;
+                
+                const gain = offline.createGain();
+                source.connect(gain);
+                gain.connect(offline.destination);
+
+                // Fade In
+                if (i > 0) {
+                    gain.gain.setValueAtTime(0, currentTime);
+                    gain.gain.linearRampToValueAtTime(1, currentTime + overlapSecs);
+                }
+                
+                // Fade Out
+                if (i < chunkBuffers.length - 1) {
+                    const fadeOutStart = currentTime + (buf.duration - overlapSecs);
+                    gain.gain.setValueAtTime(1, fadeOutStart);
+                    gain.gain.linearRampToValueAtTime(0, fadeOutStart + overlapSecs);
+                }
+
+                source.start(currentTime);
+                if (i < chunkBuffers.length - 1) {
+                    currentTime += (buf.duration - overlapSecs);
+                }
+            });
+
             task.buffer = await offline.startRendering();
+            task.duration = task.buffer.duration;
             task.status = 'ready';
             
             completedTracks.push(task);
@@ -312,7 +358,7 @@
             const container = document.getElementById('completion-list');
             container.innerHTML = completedTracks.map((t, idx) => `
                 <button onclick="window.selectTrack(${idx})" class="glass shrink-0 p-4 min-w-[140px] border-white/10 hover:border-cyan-400 transition text-left group ${activeTrackIndex === idx ? 'border-cyan-500 bg-cyan-500/10' : ''}">
-                    <span class="text-[8px] font-bold text-cyan-400 uppercase">Mastered</span>
+                    <span class="text-[8px] font-bold text-cyan-400 uppercase">Evolution v2</span>
                     <p class="text-[10px] text-white/80 line-clamp-1 font-bold">${t.prompt}</p>
                 </button>
             `).join('');
@@ -323,7 +369,7 @@
             const track = completedTracks[idx];
             document.getElementById('play-btn').disabled = false;
             document.getElementById('play-btn').classList.remove('opacity-30', 'cursor-not-allowed');
-            document.getElementById('display-title').innerText = "Track Ready";
+            document.getElementById('display-title').innerText = "Evolution Ready";
             document.getElementById('display-subtitle').innerText = track.prompt;
             document.getElementById('main-display').classList.remove('opacity-40');
             document.getElementById('playhead-container').classList.remove('hidden');
