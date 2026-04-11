@@ -3,469 +3,309 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>SONIC PRO - Pattern Synthesis</title>
+    <title>SONIC PRO | Neural Music Studio</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://unpkg.com/lucide@latest"></script>
     <style>
-        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;900&display=swap');
+        @import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;700&family=Syncopate:wght@400;700&display=swap');
         
-        body { background-color: #050508; color: #ffffff; font-family: 'Inter', sans-serif; overflow: hidden; }
-        .sonic-gradient-text { background: linear-gradient(135deg, #60a5fa, #a855f7, #ec4899); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
-        .panel-glass { background: rgba(15, 15, 20, 0.8); border: 1px solid rgba(255, 255, 255, 0.05); border-radius: 24px; backdrop-filter: blur(20px); }
-        
-        .genre-btn { border: 1px solid rgba(255, 255, 255, 0.1); background: rgba(255, 255, 255, 0.03); transition: all 0.2s ease; }
-        .genre-btn.tab-active { background: #1f1f2a; border-color: #60a5fa; color: #ffffff; box-shadow: 0 0 15px rgba(96, 165, 250, 0.2); }
-        
-        .btn-primary { background: linear-gradient(90deg, #3b82f6, #8b5cf6); box-shadow: 0 0 20px rgba(59, 130, 246, 0.4); transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1); }
-        .btn-primary:hover:not(:disabled) { transform: scale(1.02); box-shadow: 0 0 30px rgba(139, 92, 246, 0.6); }
-        
-        .timeline-container { height: 60px; background: rgba(0,0,0,0.5); border-radius: 12px; position: relative; overflow: hidden; border: 1px solid rgba(255, 255, 255, 0.1); }
-        .timeline-chunk { position: absolute; height: 100%; background: linear-gradient(90deg, #3b82f6, #8b5cf6); opacity: 0.8; border-right: 1px solid #000; transition: all 0.3s ease; }
-        .timeline-chunk.active { background: #ffffff; box-shadow: 0 0 20px #fff; z-index: 10; }
-        
-        .visualizer-bar { transition: height 0.05s linear; width: 6px; background: linear-gradient(to top, #3b82f6, #ec4899); border-radius: 3px; }
-        .spinner { border: 2px solid rgba(255, 255, 255, 0.1); border-left-color: #60a5fa; border-radius: 50%; width: 24px; height: 24px; animation: spin 1s linear infinite; }
+        :root {
+            --neon-blue: #00f2ff;
+            --neon-purple: #bc13fe;
+            --bg-dark: #08080c;
+        }
+
+        body {
+            background-color: var(--bg-dark);
+            color: #ffffff;
+            font-family: 'Space Grotesk', sans-serif;
+            overflow: hidden;
+            height: 100vh;
+        }
+
+        .header-font { font-family: 'Syncopate', sans-serif; }
+
+        .glass {
+            background: rgba(255, 255, 255, 0.03);
+            backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            border-radius: 24px;
+        }
+
+        .neon-text {
+            text-shadow: 0 0 15px rgba(0, 242, 255, 0.4);
+        }
+
+        .btn-primary {
+            background: linear-gradient(90deg, #00f2ff, #bc13fe);
+            transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+            text-transform: uppercase;
+            letter-spacing: 0.15em;
+            font-weight: 700;
+        }
+
+        .btn-primary:hover:not(:disabled) {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 40px rgba(188, 19, 254, 0.3);
+            filter: brightness(1.1);
+        }
+
+        .visual-bar {
+            width: 6px;
+            background: linear-gradient(to top, var(--neon-purple), var(--neon-blue));
+            border-radius: 3px;
+            transition: height 0.05s ease;
+        }
+
         @keyframes spin { to { transform: rotate(360deg); } }
+        .loading-spinner {
+            width: 20px;
+            height: 20px;
+            border: 2px solid rgba(255,255,255,0.1);
+            border-top-color: var(--neon-blue);
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+        }
     </style>
 </head>
-<body class="h-screen flex flex-col p-6 lg:p-10">
+<body class="flex flex-col p-6 lg:p-10">
 
-    <header class="flex items-center justify-between mb-8">
+    <header class="flex justify-between items-center mb-10">
         <div class="flex flex-col">
-            <h1 class="text-4xl lg:text-6xl font-black sonic-gradient-text tracking-tighter">SONIC PRO</h1>
-            <div class="flex items-center gap-2">
-                <span class="h-2 w-2 rounded-full bg-blue-500 animate-pulse"></span>
-                <span class="text-[10px] tracking-[0.4em] uppercase text-white/40 font-bold">Pattern Synthesis Engine | 3-Min Sequence</span>
+            <h1 class="text-4xl header-font font-bold tracking-tighter neon-text">SONIC<span class="text-[#bc13fe]">PRO</span></h1>
+            <div class="flex items-center gap-2 mt-1">
+                <span class="w-1.5 h-1.5 rounded-full bg-cyan-400 animate-pulse"></span>
+                <span class="text-[10px] uppercase tracking-[0.5em] text-white/40">Neural Generation Core</span>
             </div>
         </div>
         
-        <div class="flex items-center gap-4">
-            <button id="download-btn" onclick="exportToWav()" class="hidden border border-white/10 bg-white/5 px-6 py-3 rounded-2xl flex items-center gap-3 hover:bg-white/10 transition group">
-                <i data-lucide="download" class="w-4 h-4 text-pink-400"></i>
-                <span class="text-xs font-bold uppercase tracking-widest text-white">Download WAV</span>
+        <div class="flex gap-4">
+            <button id="download-btn" onclick="exportWav()" class="hidden glass px-6 py-3 hover:bg-white/10 transition flex items-center gap-3">
+                <i data-lucide="download" class="w-4 h-4 text-cyan-400"></i>
+                <span class="text-xs font-bold uppercase tracking-widest">Master WAV</span>
             </button>
-            <button id="engine-toggle" onclick="togglePlayback()" class="border border-white/10 bg-white/5 px-8 py-3 rounded-2xl flex items-center gap-3 hover:bg-white/10 transition group disabled:opacity-30" disabled>
-                <i id="play-icon" data-lucide="play" class="w-5 h-5 text-blue-400"></i>
-                <span id="play-text" class="text-xs font-bold uppercase tracking-widest text-white">No Sequence</span>
+            <button id="play-btn" onclick="togglePlayback()" disabled class="glass px-8 py-3 opacity-30 flex items-center gap-3 transition cursor-not-allowed">
+                <i id="play-icon" data-lucide="play" class="w-4 h-4 fill-current"></i>
+                <span id="play-text" class="text-xs font-bold uppercase tracking-widest">Engine Empty</span>
             </button>
         </div>
     </header>
 
-    <main class="flex-1 flex flex-col lg:flex-row gap-8 min-h-0">
-        <aside class="w-full lg:w-[450px] flex flex-col gap-6">
-            <div class="panel-glass p-8 flex flex-col gap-8 flex-1 overflow-y-auto">
-                <section>
-                    <label class="text-[10px] uppercase font-black text-blue-400 tracking-[0.2em] mb-4 block">1. Harmonic Profile</label>
-                    <div class="grid grid-cols-2 gap-3">
-                        <button onclick="setGenre('Cyberpunk Techno')" class="genre-btn py-3 rounded-xl text-xs font-bold hover:bg-white/10 transition tab-active">Cyberpunk</button>
-                        <button onclick="setGenre('Synthwave')" class="genre-btn py-3 rounded-xl text-xs font-bold hover:bg-white/10 transition">Synthwave</button>
-                        <button onclick="setGenre('Phonk')" class="genre-btn py-3 rounded-xl text-xs font-bold hover:bg-white/10 transition">Phonk</button>
-                        <button onclick="setGenre('Lofi Beats')" class="genre-btn py-3 rounded-xl text-xs font-bold hover:bg-white/10 transition">Lofi</button>
-                        <button onclick="setGenre('Deep Space Ambient')" class="genre-btn py-3 rounded-xl text-xs font-bold hover:bg-white/10 transition">Ambient</button>
-                        <button onclick="setGenre('Cinematic Classical')" class="genre-btn py-3 rounded-xl text-xs font-bold hover:bg-white/10 transition">Classical</button>
+    <main class="flex-1 flex flex-col lg:flex-row gap-8 overflow-hidden">
+        <aside class="w-full lg:w-[400px] flex flex-col gap-6">
+            <div class="glass p-8 flex flex-col gap-8 flex-1">
+                <div>
+                    <label class="text-[10px] font-bold uppercase text-cyan-400 tracking-widest mb-4 block">1. Describe Music</label>
+                    <textarea id="prompt-input" class="w-full bg-black/40 border border-white/10 rounded-2xl p-5 text-sm h-32 resize-none focus:outline-none focus:border-cyan-500 transition leading-relaxed" placeholder="e.g. 80s synthwave with analog pads and a driving bassline, 120bpm, neon atmosphere...">Cyberpunk cinematic dark synth, heavy analog bass, rhythmic digital textures, 100bpm, high fidelity</textarea>
+                    <div class="flex flex-wrap gap-2 mt-3">
+                        <button onclick="setExample('Hard techno beat with a heavy 909 kick, industrial warehouse vibe, dark, 140bpm')" class="text-[9px] px-2 py-1 bg-white/5 rounded border border-white/10 hover:border-cyan-400 text-white/60">Techno</button>
+                        <button onclick="setExample('Uplifting house music with a groovy bassline and piano chords, 126bpm')" class="text-[9px] px-2 py-1 bg-white/5 rounded border border-white/10 hover:border-cyan-400 text-white/60">House</button>
+                        <button onclick="setExample('Lofi hip hop drum beat with a dusty jazz piano melody, vinyl crackle, 90bpm')" class="text-[9px] px-2 py-1 bg-white/5 rounded border border-white/10 hover:border-cyan-400 text-white/60">Lofi</button>
                     </div>
-                </section>
-
-                <section>
-                    <label class="text-[10px] uppercase font-black text-blue-400 tracking-[0.2em] block mb-4">2. Sequence Prompt</label>
-                    <textarea id="prompt-input" class="w-full bg-black/40 border border-white/10 rounded-2xl p-5 text-sm h-24 resize-none focus:outline-none focus:border-blue-500 transition text-white/80" placeholder="Describe the vibe... e.g. Dark brooding bass with high-pitched chirps"></textarea>
-                </section>
-
-                <div class="space-y-3">
-                    <button id="btn-generate" onclick="startAutoCompose()" class="btn-primary w-full py-6 rounded-3xl font-black uppercase tracking-[0.2em] flex items-center justify-center gap-4 group">
-                        <span id="gen-btn-text">Generate Full Track</span>
-                        <div id="loader" class="spinner hidden"></div>
-                    </button>
                 </div>
 
-                <section class="mt-4">
-                    <label class="text-[10px] uppercase font-black text-pink-500 tracking-[0.2em] mb-4 block">Sequence Progression</label>
-                    <div class="timeline-container" id="timeline"></div>
-                    <div class="flex justify-between mt-2 px-1">
-                        <span class="text-[10px] text-white/40" id="current-duration">0:00</span>
-                        <span class="text-[10px] text-white/40">3:00+ Target</span>
+                <div class="flex-1">
+                    <label class="text-[10px] font-bold uppercase text-cyan-400 tracking-widest mb-4 block">2. Model Status</label>
+                    <div id="status-box" class="bg-black/20 rounded-xl p-4 border border-white/5 space-y-3">
+                        <div class="flex justify-between items-center">
+                            <span id="status-text" class="text-[9px] uppercase tracking-widest text-white/40">Ready to Load</span>
+                            <div id="spinner" class="loading-spinner hidden"></div>
+                        </div>
+                        <div id="progress-container" class="hidden w-full h-1 bg-white/5 rounded-full overflow-hidden">
+                            <div id="progress-bar" class="h-full bg-cyan-400 w-0 transition-all duration-300"></div>
+                        </div>
                     </div>
-                </section>
+                </div>
+
+                <div class="pt-6">
+                    <button id="gen-btn" onclick="generate()" class="btn-primary w-full py-6 rounded-2xl flex items-center justify-center gap-4">
+                        <span id="gen-text">Generate Music</span>
+                    </button>
+                    <p class="text-[9px] text-center mt-4 text-white/20 uppercase tracking-widest italic">Note: Full generation (~10s) takes 2-4 minutes on most browsers.</p>
+                </div>
             </div>
         </aside>
 
-        <section class="flex-1 flex flex-col gap-6">
-            <div class="flex-1 panel-glass relative overflow-hidden flex flex-col items-center justify-center p-12">
-                <div class="absolute inset-0 opacity-10 pointer-events-none">
-                    <canvas id="main-visualizer"></canvas>
-                </div>
+        <section class="flex-1 glass relative flex flex-col items-center justify-center p-12 overflow-hidden">
+            <div id="viz-container" class="flex gap-2 h-64 items-end mb-16"></div>
 
-                <div class="relative z-10 flex flex-col items-center text-center gap-8">
-                    <div id="track-info" class="opacity-0 transition-opacity">
-                        <span class="px-4 py-1.5 rounded-full border border-blue-500/30 text-[10px] font-black uppercase tracking-widest text-blue-400 bg-blue-500/10">SYNTHETIC OSCILLATOR ARRAY</span>
-                    </div>
-                    
-                    <h2 id="main-display" class="text-4xl lg:text-7xl font-black tracking-tighter max-w-4xl leading-[1.1] transition-all duration-500 text-white/20 uppercase">
-                        STANDBY
-                    </h2>
-                    
-                    <div id="visualizer-mini" class="flex gap-1 h-16 items-end"></div>
-                </div>
-
-                <div class="absolute bottom-8 left-8 right-8 flex items-center justify-between bg-black/60 backdrop-blur-md border border-white/10 rounded-2xl px-8 py-5">
-                    <div class="flex flex-col">
-                        <span class="text-[8px] uppercase font-black text-blue-400 tracking-[0.2em]">Engine Status</span>
-                        <span id="status-text" class="text-sm font-bold">Idle</span>
-                    </div>
-                    <div class="flex flex-col items-end">
-                        <span class="text-[8px] uppercase font-black text-pink-500 tracking-[0.2em]">Active Voices</span>
-                        <span id="voice-count" class="text-sm font-mono">0</span>
-                    </div>
-                </div>
+            <div id="main-display" class="text-center transition-all duration-500 opacity-40">
+                <h2 id="display-title" class="text-7xl font-bold header-font tracking-tighter italic uppercase">Standby</h2>
+                <p id="display-subtitle" class="text-xs uppercase tracking-[0.8em] text-cyan-400 mt-6 font-bold">Neural Engine Offline</p>
             </div>
         </section>
     </main>
 
-    <script>
-        const apiKey = "";
-        let audioCtx, analyser, masterGain;
-        let isPlaying = false;
-        let isComposing = false;
-        let songData = []; // Array of patterns
-        let bpm = 120;
-        let startTime = 0;
-        let activeOscillators = 0;
+    <script type="module">
+        import { 
+            AutoTokenizer, 
+            MusicgenForConditionalGeneration, 
+            env 
+        } from 'https://cdn.jsdelivr.net/npm/@huggingface/transformers@3.0.0';
 
-        window.onload = () => {
-            lucide.createIcons();
-            const mini = document.getElementById('visualizer-mini');
-            for(let i=0; i<32; i++) {
-                const bar = document.createElement('div');
-                bar.className = 'visualizer-bar';
-                bar.style.height = '8px';
-                mini.appendChild(bar);
-            }
-        };
+        lucide.createIcons();
 
-        window.setGenre = (g) => {
-            document.getElementById('prompt-input').value = `Create a ${g} sequence with distinct bass and lead layers.`;
-            document.querySelectorAll('.genre-btn').forEach(b => {
-                b.classList.toggle('tab-active', b.innerText.includes(g));
-            });
-        };
+        // Environment Config
+        env.allowLocalModels = false;
+        env.useBrowserCache = true;
+        
+        let tokenizer = null;
+        let model = null;
+        let audioCtx, analyser, masterBuffer, sourceNode, isPlaying = false;
 
-        async function startAutoCompose() {
-            if (isComposing) return;
-            isComposing = true;
-            songData = [];
-            setLoading(true);
-            updateStatus("Generating Musical Patterns...");
-            document.getElementById('timeline').innerHTML = '';
-            document.getElementById('download-btn').classList.add('hidden');
-
-            const prompt = document.getElementById('prompt-input').value || "Upbeat electronic music";
-            
-            // To reach 3 minutes (180s) at 120BPM:
-            // 120 BPM means 2 beats per second.
-            // 180 seconds = 360 beats.
-            // Each pattern is 32 beats long.
-            // 360 / 32 = 11.25. 
-            // We'll generate 12 patterns to ensure it covers 3 minutes (total ~192 seconds).
-            const totalPatterns = 12;
-
-            for (let i = 0; i < totalPatterns; i++) {
-                try {
-                    updateStatus(`Composing Segment ${i+1}/${totalPatterns}...`);
-                    const pattern = await fetchPattern(prompt, i);
-                    songData.push(pattern);
-                    addTimelineChunk(i, totalPatterns);
-                    
-                    if (i === 0) {
-                        document.getElementById('engine-toggle').disabled = false;
-                        document.getElementById('play-text').innerText = "Play Sequence";
-                        document.getElementById('track-info').classList.remove('opacity-0');
-                    }
-                } catch (e) {
-                    console.error("Pattern fetch failed", e);
-                    updateStatus(`Retrying Segment ${i+1}...`);
-                    i--; // Retry
-                    await new Promise(r => setTimeout(r, 2000));
-                }
-            }
-
-            setLoading(false);
-            isComposing = false;
-            updateStatus("Full 3-Min Composition Ready");
-            document.getElementById('main-display').innerText = "TRACK READY";
-            document.getElementById('download-btn').classList.remove('hidden');
+        // Visualizer Setup
+        const viz = document.getElementById('viz-container');
+        for(let i=0; i<32; i++) {
+            const bar = document.createElement('div');
+            bar.className = 'visual-bar';
+            bar.style.height = '12px';
+            viz.appendChild(bar);
         }
 
-        async function fetchPattern(userPrompt, index) {
-            const systemPrompt = `You are a music sequencer. Return ONLY a JSON object representing an 8-bar musical pattern.
-            Schema: {
-              "bpm": 120,
-              "bass": [{"note": "C2", "time": 0, "duration": 0.5}, ...],
-              "lead": [{"note": "G3", "time": 0.5, "duration": 0.25}, ...],
-              "style": "techno"
-            }
-            Notes use scientific notation (e.g., C2, G3, A#4). 'time' is in beats (0 to 32). Bass should be rhythmic. Lead should be melodic. Duration in beats.`;
+        window.setExample = (val) => {
+            document.getElementById('prompt-input').value = val;
+        };
 
-            const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${apiKey}`;
-            
-            const fetchWithRetry = async (retries = 5, delay = 1000) => {
-                try {
-                    const response = await fetch(url, {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({
-                            contents: [{ parts: [{ text: `Generate a pattern for: ${userPrompt}. This is segment ${index} of the song. Be creative with the progression.` }] }],
-                            systemInstruction: { parts: [{ text: systemPrompt }] },
-                            generationConfig: { 
-                                responseMimeType: "application/json"
-                            }
-                        })
-                    });
-                    if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
-                    return await response.json();
-                } catch (err) {
-                    if (retries > 0) {
-                        await new Promise(r => setTimeout(r, delay));
-                        return fetchWithRetry(retries - 1, delay * 2);
-                    }
-                    throw err;
-                }
-            };
+        window.generate = async () => {
+            const prompt = document.getElementById('prompt-input').value;
+            if (!prompt) return;
 
-            const result = await fetchWithRetry();
-            const rawText = result.candidates[0].content.parts[0].text;
+            const genBtn = document.getElementById('gen-btn');
+            const statusText = document.getElementById('status-text');
+            const subTitle = document.getElementById('display-subtitle');
             
-            const jsonMatch = rawText.match(/\{[\s\S]*\}/);
-            if (!jsonMatch) throw new Error("No valid JSON pattern found in engine response");
+            genBtn.disabled = true;
+            document.getElementById('spinner').classList.remove('hidden');
+            document.getElementById('display-title').innerText = "Synthesizing";
             
             try {
-                const cleanedJson = jsonMatch[0].trim();
-                return JSON.parse(cleanedJson);
-            } catch (err) {
-                console.error("JSON Parse Error on source text:", jsonMatch[0]);
-                throw new Error("Pattern synthesis failed due to malformed data.");
-            }
-        }
+                if (!model || !tokenizer) {
+                    statusText.innerText = "Loading AI Core...";
+                    tokenizer = await AutoTokenizer.from_pretrained('Xenova/musicgen-small');
+                    
+                    statusText.innerText = "Downloading Neural Weights...";
+                    model = await MusicgenForConditionalGeneration.from_pretrained('Xenova/musicgen-small', {
+                        progress_callback: (p) => {
+                            if (p.status === 'progress') {
+                                document.getElementById('progress-container').classList.remove('hidden');
+                                const pct = (p.loaded / p.total) * 100;
+                                document.getElementById('progress-bar').style.width = pct + '%';
+                                statusText.innerText = `Loading Weights: ${Math.round(pct)}%`;
+                            }
+                        }
+                    });
+                }
 
-        function addTimelineChunk(i, total) {
-            const timeline = document.getElementById('timeline');
-            const div = document.createElement('div');
-            div.className = 'timeline-chunk';
-            div.id = `chunk-${i}`;
-            div.style.left = `${(i / total) * 100}%`;
-            div.style.width = `${(1 / total) * 100}%`;
-            timeline.appendChild(div);
-        }
+                statusText.innerText = "Inference Running (Large Buffer)...";
+                subTitle.innerText = "This will take a moment - Rendering actual beats...";
 
-        function togglePlayback() {
-            if (isPlaying) stopPlayback();
-            else startPlayback();
-        }
+                // Tokenize text prompt
+                const inputs = tokenizer(prompt, { padding: true, truncation: true, return_tensors: 'pt' });
 
-        function startPlayback() {
-            if (!audioCtx) {
-                audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-                analyser = audioCtx.createAnalyser();
-                masterGain = audioCtx.createGain();
-                analyser.fftSize = 256;
-                masterGain.connect(analyser);
-                analyser.connect(audioCtx.destination);
-            }
-            if (audioCtx.state === 'suspended') audioCtx.resume();
-            
-            isPlaying = true;
-            startTime = audioCtx.currentTime;
-            bpm = songData[0].bpm || 120;
-            
-            document.getElementById('play-icon').setAttribute('data-lucide', 'square');
-            document.getElementById('main-display').innerText = "PLAYING";
-            lucide.createIcons();
-            
-            scheduleLoop();
-            renderVisuals();
-        }
-
-        function stopPlayback() {
-            isPlaying = false;
-            document.getElementById('play-icon').setAttribute('data-lucide', 'play');
-            document.getElementById('main-display').innerText = "TRACK READY";
-            lucide.createIcons();
-        }
-
-        function scheduleLoop() {
-            if (!isPlaying) return;
-
-            const beatDuration = 60 / bpm;
-            const songElapsed = audioCtx.currentTime - startTime;
-            const currentBeat = songElapsed / beatDuration;
-            
-            const patternIndex = Math.floor(currentBeat / 32);
-            
-            if (patternIndex >= songData.length) {
-                stopPlayback();
-                return;
-            }
-
-            const localBeat = currentBeat % 32;
-            
-            document.querySelectorAll('.timeline-chunk').forEach((c, idx) => {
-                c.classList.toggle('active', idx === patternIndex);
-            });
-
-            const pattern = songData[patternIndex];
-            ['bass', 'lead'].forEach(layer => {
-                pattern[layer].forEach(note => {
-                    if (note.time >= localBeat && note.time < localBeat + 0.1 && !note.played) {
-                        playNote(note.note, note.duration * beatDuration, layer, audioCtx, masterGain);
-                        note.played = true;
-                    }
+                // Generate audio tokens
+                // CHANGED: max_new_tokens increased from 150 to 1000 (~10-15 seconds of audio)
+                // CHANGED: guidance_scale added to make the model follow the prompt more strictly
+                const audio_values = await model.generate({
+                    inputs: inputs.input_ids,
+                    attention_mask: inputs.attention_mask,
+                    max_new_tokens: 1000, 
+                    do_sample: true,
+                    guidance_scale: 3.5
                 });
-            });
 
-            if (localBeat < 0.1) {
-                pattern.bass.forEach(n => n.played = false);
-                pattern.lead.forEach(n => n.played = false);
+                // Decode audio values
+                const audioData = audio_values.data;
+                const samplingRate = model.config.audio_encoder.sampling_rate;
+
+                finalizeAudio(audioData, samplingRate);
+
+            } catch (err) {
+                console.error("Neural Error Detail:", err);
+                statusText.innerText = "Generation Failed.";
+                subTitle.innerText = "Error: " + err.message;
+                resetUI();
             }
+        };
 
-            const mins = Math.floor(songElapsed / 60);
-            const secs = Math.floor(songElapsed % 60);
-            document.getElementById('current-duration').innerText = `${mins}:${secs.toString().padStart(2, '0')}`;
+        function finalizeAudio(audioData, rate) {
+            if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
             
-            requestAnimationFrame(scheduleLoop);
+            const raw = new Float32Array(audioData);
+            masterBuffer = audioCtx.createBuffer(1, raw.length, rate);
+            masterBuffer.getChannelData(0).set(raw);
+
+            document.getElementById('gen-btn').disabled = false;
+            document.getElementById('spinner').classList.add('hidden');
+            document.getElementById('play-btn').disabled = false;
+            document.getElementById('play-btn').classList.remove('opacity-30', 'cursor-not-allowed');
+            document.getElementById('display-title').innerText = "Track Finalized";
+            document.getElementById('main-display').classList.remove('opacity-40');
+            document.getElementById('play-text').innerText = "Play Arrangement";
+            document.getElementById('download-btn').classList.remove('hidden');
+            document.getElementById('status-text').innerText = "Inference Successful";
+            document.getElementById('progress-container').classList.add('hidden');
+            document.getElementById('display-subtitle').innerText = "Audio Master Ready";
         }
 
-        function playNote(name, duration, type, ctx, destination) {
-            const freq = getFreq(name);
-            if (!freq) return;
-
-            const osc = ctx.createOscillator();
-            const env = ctx.createGain();
-            const filter = ctx.createBiquadFilter();
-
-            osc.type = type === 'bass' ? 'sawtooth' : 'square';
-            osc.frequency.setValueAtTime(freq, ctx.currentTime);
-            
-            filter.type = "lowpass";
-            filter.frequency.setValueAtTime(type === 'bass' ? 300 : 1500, ctx.currentTime);
-            filter.frequency.exponentialRampToValueAtTime(80, ctx.currentTime + duration);
-
-            env.gain.setValueAtTime(0, ctx.currentTime);
-            env.gain.linearRampToValueAtTime(type === 'bass' ? 0.4 : 0.15, ctx.currentTime + 0.02);
-            env.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + duration);
-            
-            osc.connect(filter);
-            filter.connect(env);
-            env.connect(destination);
-            
-            activeOscillators++;
-            updateVoiceCount();
-
-            osc.start();
-            osc.stop(ctx.currentTime + duration);
-            
-            osc.onended = () => {
-                activeOscillators--;
-                updateVoiceCount();
-            };
+        function resetUI() {
+            document.getElementById('gen-btn').disabled = false;
+            document.getElementById('spinner').classList.add('hidden');
+            document.getElementById('display-title').innerText = "Idle";
+            document.getElementById('progress-container').classList.add('hidden');
         }
 
-        function updateVoiceCount() {
-            const el = document.getElementById('voice-count');
-            if (el) el.innerText = activeOscillators;
-        }
+        window.togglePlayback = () => {
+            if (isPlaying) {
+                if (sourceNode) sourceNode.stop();
+                isPlaying = false;
+            } else {
+                if (audioCtx.state === 'suspended') audioCtx.resume();
+                analyser = audioCtx.createAnalyser();
+                sourceNode = audioCtx.createBufferSource();
+                sourceNode.buffer = masterBuffer;
+                sourceNode.loop = true;
+                sourceNode.connect(analyser);
+                analyser.connect(audioCtx.destination);
+                sourceNode.start(0);
+                isPlaying = true;
+                updateFrame();
+            }
+            document.getElementById('play-icon').setAttribute('data-lucide', isPlaying ? 'square' : 'play');
+            document.getElementById('play-text').innerText = isPlaying ? "Stop Audio" : "Play Arrangement";
+            lucide.createIcons();
+        };
 
-        function getFreq(name) {
-            const notes = { 'C': 0, 'C#': 1, 'Db': 1, 'D': 2, 'D#': 3, 'Eb': 3, 'E': 4, 'F': 5, 'F#': 6, 'Gb': 6, 'G': 7, 'G#': 8, 'Ab': 8, 'A': 9, 'A#': 10, 'Bb': 10, 'B': 11 };
-            const octave = parseInt(name.slice(-1));
-            const note = name.slice(0, -1);
-            if (isNaN(octave) || notes[note] === undefined) return null;
-            return 440 * Math.pow(2, (notes[note] + (octave - 4) * 12) / 12);
-        }
-
-        function renderVisuals() {
+        function updateFrame() {
             if (!isPlaying) return;
             const data = new Uint8Array(analyser.frequencyBinCount);
             analyser.getByteFrequencyData(data);
-            const bars = document.querySelectorAll('.visualizer-bar');
-            bars.forEach((b, i) => {
-                const val = data[i % data.length];
-                b.style.height = `${Math.max(8, (val / 255) * 64)}px`;
+            document.querySelectorAll('.visual-bar').forEach((b, i) => {
+                const val = (data[i * 4] / 255) * 240;
+                b.style.height = Math.max(8, val) + 'px';
             });
-            requestAnimationFrame(renderVisuals);
+            requestAnimationFrame(updateFrame);
         }
 
-        async function exportToWav() {
-            updateStatus("Rendering 3-Min WAV...");
-            // Use total length of all patterns for the buffer
-            const totalDuration = songData.length * 32 * (60 / bpm);
-            const offlineCtx = new OfflineAudioContext(1, 44100 * totalDuration, 44100);
-            const beatDuration = 60 / bpm;
-
-            songData.forEach((pattern, pIdx) => {
-                const offset = pIdx * 32 * beatDuration;
-                ['bass', 'lead'].forEach(layer => {
-                    pattern[layer].forEach(note => {
-                        const noteFreq = getFreq(note.note);
-                        if (!noteFreq) return;
-
-                        const osc = offlineCtx.createOscillator();
-                        const env = offlineCtx.createGain();
-                        const filter = offlineCtx.createBiquadFilter();
-
-                        osc.type = layer === 'bass' ? 'sawtooth' : 'square';
-                        osc.frequency.setValueAtTime(noteFreq, offset + note.time * beatDuration);
-                        
-                        filter.type = "lowpass";
-                        filter.frequency.setValueAtTime(layer === 'bass' ? 300 : 1500, offset + note.time * beatDuration);
-                        filter.frequency.exponentialRampToValueAtTime(80, offset + (note.time + note.duration) * beatDuration);
-
-                        env.gain.setValueAtTime(0, offset + note.time * beatDuration);
-                        env.gain.linearRampToValueAtTime(layer === 'bass' ? 0.4 : 0.15, offset + note.time * beatDuration + 0.02);
-                        env.gain.exponentialRampToValueAtTime(0.001, offset + (note.time + note.duration) * beatDuration);
-
-                        osc.connect(filter);
-                        filter.connect(env);
-                        env.connect(offlineCtx.destination);
-                        osc.start(offset + note.time * beatDuration);
-                        osc.stop(offset + (note.time + note.duration) * beatDuration);
-                    });
-                });
-            });
-
-            const renderedBuffer = await offlineCtx.startRendering();
-            const wavData = audioBufferToWav(renderedBuffer);
-            const blob = new Blob([wavData], { type: 'audio/wav' });
-            const url = URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.href = url;
-            a.download = "sonic-pro-full-master.wav";
-            a.click();
-            updateStatus("Export Complete");
-        }
-
-        function audioBufferToWav(buffer) {
-            let length = buffer.length * 2 + 44, bufferArr = new ArrayBuffer(length), view = new DataView(bufferArr), pos = 0;
-            const setUint32 = (d) => { view.setUint32(pos, d, true); pos += 4; };
-            const setUint16 = (d) => { view.setUint16(pos, d, true); pos += 2; };
-            setUint32(0x46464952); setUint32(length - 8); setUint32(0x45564157);
-            setUint32(0x20746d66); setUint32(16); setUint16(1); setUint16(1);
-            setUint32(buffer.sampleRate); setUint32(buffer.sampleRate * 2);
-            setUint16(2); setUint16(16); setUint32(0x61746164); setUint32(length - pos - 4);
-            const chan = buffer.getChannelData(0);
-            for(let i = 0; i < chan.length; i++) {
+        window.exportWav = () => {
+            const buffer = masterBuffer;
+            const length = buffer.length * 2 + 44;
+            const out = new ArrayBuffer(length);
+            const view = new DataView(out);
+            const writeS = (o, s) => { for(let i=0; i<s.length; i++) view.setUint8(o+i, s.charCodeAt(i)); };
+            writeS(0, 'RIFF'); view.setUint32(4, length - 8, true); writeS(8, 'WAVE');
+            writeS(12, 'fmt '); view.setUint32(16, 16, true); view.setUint16(20, 1, true);
+            view.setUint16(22, 1, true); view.setUint32(24, buffer.sampleRate, true);
+            view.setUint32(28, buffer.sampleRate * 2, true); view.setUint16(32, 2, true);
+            view.setUint16(34, 16, true); writeS(36, 'data'); view.setUint32(40, length - 44, true);
+            let offset = 44; const chan = buffer.getChannelData(0);
+            for(let i=0; i<chan.length; i++, offset+=2) {
                 let s = Math.max(-1, Math.min(1, chan[i]));
-                view.setInt16(pos, s < 0 ? s * 32768 : s * 32767, true);
-                pos += 2;
+                view.setInt16(offset, s < 0 ? s * 0x8000 : s * 0x7FFF, true);
             }
-            return bufferArr;
-        }
-
-        function setLoading(l) {
-            document.getElementById('loader').classList.toggle('hidden', !l);
-            document.getElementById('btn-generate').disabled = l;
-            document.getElementById('gen-btn-text').innerText = l ? "Synthesizing full track..." : "Generate Full Track";
-        }
-
-        function updateStatus(m) { document.getElementById('status-text').innerText = m; }
+            const link = document.createElement('a');
+            link.href = URL.createObjectURL(new Blob([out], { type: 'audio/wav' }));
+            link.download = "SONIC_PRO_MASTER.wav";
+            link.click();
+        };
     </script>
 </body>
-</html>
