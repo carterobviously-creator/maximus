@@ -86,7 +86,7 @@
             <h1 class="text-4xl header-font font-bold tracking-tighter neon-text">SONIC<span class="text-[#bc13fe]">PRO</span></h1>
             <div class="flex items-center gap-2 mt-1">
                 <span class="w-1.5 h-1.5 rounded-full bg-emerald-400"></span>
-                <span class="text-[10px] uppercase tracking-[0.5em] text-white/40">GPU Turbo Mode: Active</span>
+                <span class="text-[10px] uppercase tracking-[0.5em] text-white/40">ULTRA GPU MODE: WEBGPU-FP16</span>
             </div>
         </div>
         
@@ -97,7 +97,7 @@
             </button>
             <button id="play-btn" onclick="togglePlayback()" disabled class="glass px-8 py-3 opacity-30 flex items-center gap-3 transition cursor-not-allowed">
                 <i id="play-icon" data-lucide="play" class="w-4 h-4 fill-current"></i>
-                <span id="play-text" class="text-xs font-bold uppercase tracking-widest">Wait for Sync</span>
+                <span id="play-text" class="text-xs font-bold uppercase tracking-widest">Awaiting Render</span>
             </button>
         </div>
     </header>
@@ -107,12 +107,12 @@
             <div class="glass p-8 flex flex-col gap-6 shrink-0">
                 <div>
                     <label class="text-[10px] font-bold uppercase text-cyan-400 tracking-widest mb-3 block">Neural Prompt</label>
-                    <textarea id="prompt-input" class="w-full bg-black/40 border border-white/10 rounded-2xl p-5 text-sm h-24 resize-none focus:outline-none focus:border-cyan-500 transition leading-relaxed" placeholder="Describe your sound...">Synthwave, high energy, fast tempo, driving bassline</textarea>
+                    <textarea id="prompt-input" class="w-full bg-black/40 border border-white/10 rounded-2xl p-5 text-sm h-24 resize-none focus:outline-none focus:border-cyan-500 transition leading-relaxed" placeholder="Describe your sound...">Hard techno, industrial warehouse vibe, heavy distorted kick, 140bpm</textarea>
                 </div>
 
                 <div>
                     <div class="flex justify-between items-center mb-3">
-                        <label class="text-[10px] font-bold uppercase text-cyan-400 tracking-widest">Target Length</label>
+                        <label class="text-[10px] font-bold uppercase text-cyan-400 tracking-widest">Duration</label>
                         <span id="length-display" class="text-[10px] font-bold text-white/60">180s (3m)</span>
                     </div>
                     <input type="range" id="duration-slider" min="30" max="180" step="30" value="180" oninput="updateLengthDisplay(this.value)" class="w-full h-1 bg-white/10 rounded-lg appearance-none cursor-pointer">
@@ -126,15 +126,15 @@
 
             <div class="glass flex-1 p-6 flex flex-col overflow-hidden">
                 <div class="flex justify-between items-center mb-4">
-                    <label class="text-[10px] font-bold uppercase text-white/40 tracking-widest">Processing Core</label>
+                    <label class="text-[10px] font-bold uppercase text-white/40 tracking-widest">GPU Buffer</label>
                     <span id="queue-count" class="text-[10px] bg-white/10 px-2 py-0.5 rounded-full text-white/60">0</span>
                 </div>
                 <div id="queue-list" class="flex-1 overflow-y-auto space-y-3 pr-2">
-                    <div class="text-center py-10 opacity-20 text-xs italic">Awaiting Sequence</div>
+                    <div class="text-center py-10 opacity-20 text-xs italic">System Clear</div>
                 </div>
                 <div id="batch-status" class="mt-4 pt-4 border-t border-white/5 hidden">
                     <div class="flex justify-between items-center mb-2">
-                        <span id="status-text" class="text-[9px] uppercase tracking-widest text-cyan-400">Booting GPU...</span>
+                        <span id="status-text" class="text-[9px] uppercase tracking-widest text-cyan-400">Loading Lite Weights...</span>
                         <div id="spinner" class="loading-spinner"></div>
                     </div>
                     <div class="w-full h-1.5 bg-white/5 rounded-full overflow-hidden">
@@ -162,9 +162,9 @@
     <script id="worker-script" type="text/plain">
         import { AutoTokenizer, MusicgenForConditionalGeneration, env } from 'https://cdn.jsdelivr.net/npm/@huggingface/transformers@3.0.0';
         
-        // Enabling WebGPU if available for maximum speed
+        // Optimize for speed: Don't check for local models, use proxies, force WebGPU
         env.allowLocalModels = false;
-        env.backends.onnx.wasm.proxy = false; 
+        env.useBrowserCache = true;
 
         let tokenizer, model;
 
@@ -172,17 +172,25 @@
             const { task } = e.data;
             try {
                 if (!model) {
+                    self.postMessage({ type: 'status', data: 'Mounting WebGPU Core...' });
                     tokenizer = await AutoTokenizer.from_pretrained('Xenova/musicgen-small');
+                    
+                    // FORCED SPEED FIX:
+                    // Using dtype: 'fp16' makes the model much smaller and faster on GPU.
+                    // device: 'webgpu' ensures hardware acceleration.
                     model = await MusicgenForConditionalGeneration.from_pretrained('Xenova/musicgen-small', {
-                        device: 'webgpu', // Attempt WebGPU acceleration
+                        device: 'webgpu',
+                        dtype: 'fp16', 
                         progress_callback: (p) => {
-                            if (p.status === 'progress') self.postMessage({ type: 'progress', data: (p.loaded/p.total)*100 });
+                            if (p.status === 'progress') {
+                                self.postMessage({ type: 'progress', data: (p.loaded/p.total)*100 });
+                            }
                         }
                     });
                 }
 
-                // Chunking logic optimized for 3-minute generation within 30s-3min
-                const stepSeconds = 10;
+                // Chunking logic to hit that 30s-3min generation window
+                const stepSeconds = 15; // Increased step size for fewer inference rounds
                 const chunksNeeded = Math.ceil(task.duration / stepSeconds); 
                 let fullAudioData = [];
                 const sampleRate = model.config.audio_encoder.sampling_rate;
@@ -191,26 +199,22 @@
                     const chunkProgress = Math.round(((i + 1) / chunksNeeded) * 100);
                     self.postMessage({ 
                         type: 'status', 
-                        data: `Syncing Frame ${i+1}/${chunksNeeded} (${chunkProgress}%)` 
+                        data: `Rendering Block ${i+1}/${chunksNeeded} (${chunkProgress}%)` 
                     });
                     
                     const inputs = tokenizer(task.prompt, { padding: true, truncation: true, return_tensors: 'pt' });
                     
-                    // max_new_tokens set to produce ~10s per block
-                    // Using top_k and temperature for faster but quality sampling
+                    // Optimized for raw speed
                     const audio_values = await model.generate({
                         inputs: inputs.input_ids,
                         attention_mask: inputs.attention_mask,
-                        max_new_tokens: 512, 
+                        max_new_tokens: 750, // Roughly 15s worth of tokens
                         do_sample: true,
                         guidance_scale: 3.0,
-                        temperature: 1.0,
-                        top_k: 250
+                        temperature: 1.0
                     });
                     
                     fullAudioData.push(audio_values.data);
-                    
-                    // Yield to main thread to maintain responsiveness
                     await new Promise(r => setTimeout(r, 0));
                 }
 
@@ -221,12 +225,7 @@
                     taskId: task.id
                 });
             } catch (err) {
-                // Fallback to CPU if WebGPU fails
-                if (err.message.includes('WebGPU')) {
-                   self.postMessage({ type: 'status', data: 'GPU Unavailable. Falling back to CPU...' });
-                   // Re-attempt without webgpu device would normally happen here, 
-                   // but for this demo we'll just throw the error to be handled by UI
-                }
+                console.error("Worker Error:", err);
                 self.postMessage({ type: 'error', data: err.message });
             }
         };
@@ -257,7 +256,6 @@
             } else if (type === 'success') {
                 handleGenerationSuccess(audioChunks, sampleRate, taskId);
             } else if (type === 'error') {
-                console.error("Engine Error:", data);
                 isProcessing = false;
                 processQueue();
             }
@@ -331,7 +329,8 @@
                 return b;
             });
 
-            const overlapSecs = 1.5; 
+            // Fast crossfade assembly
+            const overlapSecs = 1.0; 
             const overlapSamples = Math.floor(overlapSecs * sampleRate);
             
             let totalLength = 0;
@@ -346,7 +345,6 @@
             chunkBuffers.forEach((buf, i) => {
                 const source = offline.createBufferSource();
                 source.buffer = buf;
-                
                 const gain = offline.createGain();
                 source.connect(gain);
                 gain.connect(offline.destination);
@@ -369,7 +367,6 @@
             });
 
             task.buffer = await offline.startRendering();
-            task.duration = task.buffer.duration;
             task.status = 'ready';
             
             completedTracks.push(task);
@@ -377,7 +374,6 @@
             
             renderQueue();
             renderCompleted();
-            
             if (activeTrackIndex === -1) selectTrack(completedTracks.length - 1);
             
             isProcessing = false;
@@ -390,7 +386,7 @@
             container.innerHTML = completedTracks.map((t, idx) => `
                 <button onclick="window.selectTrack(${idx})" class="glass shrink-0 p-4 min-w-[160px] border-white/10 hover:border-cyan-400 transition text-left group ${activeTrackIndex === idx ? 'border-cyan-500 bg-cyan-500/10' : ''}">
                     <div class="flex justify-between items-center mb-1">
-                        <span class="text-[8px] font-bold text-cyan-400 uppercase">3M EXPORT</span>
+                        <span class="text-[8px] font-bold text-cyan-400 uppercase">ULTRA EXPORT</span>
                         <i data-lucide="music" class="w-2 h-2 text-white/20"></i>
                     </div>
                     <p class="text-[10px] text-white/90 line-clamp-1 font-bold">${t.prompt}</p>
@@ -404,7 +400,7 @@
             const track = completedTracks[idx];
             document.getElementById('play-btn').disabled = false;
             document.getElementById('play-btn').classList.remove('opacity-30', 'cursor-not-allowed');
-            document.getElementById('display-title').innerText = "Render Complete";
+            document.getElementById('display-title').innerText = "Evolution Rendered";
             document.getElementById('display-subtitle').innerText = track.prompt;
             document.getElementById('main-display').classList.remove('opacity-40');
             document.getElementById('playhead-container').classList.remove('hidden');
@@ -431,10 +427,9 @@
                 const startTime = audioCtx.currentTime;
                 currentSourceNode.start(0);
                 isPlaying = true;
-                updateFrame(startTime, track.duration);
+                updateFrame(startTime, track.buffer.duration);
             }
             document.getElementById('play-icon').setAttribute('data-lucide', isPlaying ? 'square' : 'play');
-            document.getElementById('play-text').innerText = isPlaying ? "Halt" : "Play";
             lucide.createIcons();
         };
 
@@ -469,7 +464,7 @@
             }
             const link = document.createElement('a');
             link.href = URL.createObjectURL(new Blob([out], { type: 'audio/wav' }));
-            link.download = `SONIC_PRO_${Date.now()}.wav`;
+            link.download = `SONIC_TURBO_${Date.now()}.wav`;
             link.click();
         };
     </script>
