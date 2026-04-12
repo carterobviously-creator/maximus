@@ -86,7 +86,7 @@
             <h1 class="text-4xl header-font font-bold tracking-tighter neon-text">SONIC<span class="text-[#bc13fe]">PRO</span></h1>
             <div class="flex items-center gap-2 mt-1">
                 <span class="w-1.5 h-1.5 rounded-full bg-emerald-400"></span>
-                <span class="text-[10px] uppercase tracking-[0.5em] text-white/40">ULTRA GPU MODE: WEBGPU-FP16</span>
+                <span class="text-[10px] uppercase tracking-[0.5em] text-white/40">TURBO MODE: Q4-WEBGPU</span>
             </div>
         </div>
         
@@ -162,9 +162,12 @@
     <script id="worker-script" type="text/plain">
         import { AutoTokenizer, MusicgenForConditionalGeneration, env } from 'https://cdn.jsdelivr.net/npm/@huggingface/transformers@3.0.0';
         
-        // Optimize for speed: Don't check for local models, use proxies, force WebGPU
+        // FORCE LITE CONFIGURATION
         env.allowLocalModels = false;
         env.useBrowserCache = true;
+        
+        // This is crucial: Use the optimized repository for web-ready weights
+        const MODEL_ID = 'onnx-community/musicgen-small';
 
         let tokenizer, model;
 
@@ -172,15 +175,15 @@
             const { task } = e.data;
             try {
                 if (!model) {
-                    self.postMessage({ type: 'status', data: 'Mounting WebGPU Core...' });
-                    tokenizer = await AutoTokenizer.from_pretrained('Xenova/musicgen-small');
+                    self.postMessage({ type: 'status', data: 'Fetching Quantized Core...' });
                     
-                    // FORCED SPEED FIX:
-                    // Using dtype: 'fp16' makes the model much smaller and faster on GPU.
-                    // device: 'webgpu' ensures hardware acceleration.
-                    model = await MusicgenForConditionalGeneration.from_pretrained('Xenova/musicgen-small', {
+                    tokenizer = await AutoTokenizer.from_pretrained(MODEL_ID);
+                    
+                    // SPEED FIX: Use 'q4' for extremely small download size (~150MB) 
+                    // Use WebGPU for near-instant rendering
+                    model = await MusicgenForConditionalGeneration.from_pretrained(MODEL_ID, {
                         device: 'webgpu',
-                        dtype: 'fp16', 
+                        dtype: 'q4', 
                         progress_callback: (p) => {
                             if (p.status === 'progress') {
                                 self.postMessage({ type: 'progress', data: (p.loaded/p.total)*100 });
@@ -189,8 +192,7 @@
                     });
                 }
 
-                // Chunking logic to hit that 30s-3min generation window
-                const stepSeconds = 15; // Increased step size for fewer inference rounds
+                const stepSeconds = 15;
                 const chunksNeeded = Math.ceil(task.duration / stepSeconds); 
                 let fullAudioData = [];
                 const sampleRate = model.config.audio_encoder.sampling_rate;
@@ -199,16 +201,15 @@
                     const chunkProgress = Math.round(((i + 1) / chunksNeeded) * 100);
                     self.postMessage({ 
                         type: 'status', 
-                        data: `Rendering Block ${i+1}/${chunksNeeded} (${chunkProgress}%)` 
+                        data: `Rendering Chunk ${i+1}/${chunksNeeded} (${chunkProgress}%)` 
                     });
                     
                     const inputs = tokenizer(task.prompt, { padding: true, truncation: true, return_tensors: 'pt' });
                     
-                    // Optimized for raw speed
                     const audio_values = await model.generate({
                         inputs: inputs.input_ids,
                         attention_mask: inputs.attention_mask,
-                        max_new_tokens: 750, // Roughly 15s worth of tokens
+                        max_new_tokens: 750, 
                         do_sample: true,
                         guidance_scale: 3.0,
                         temperature: 1.0
@@ -249,15 +250,15 @@
             
             if (type === 'progress') {
                 document.getElementById('progress-bar').style.width = data + '%';
+                if (data > 0) document.getElementById('status-text').innerText = `Downloading Engine: ${Math.round(data)}%`;
             } else if (type === 'status') {
                 document.getElementById('status-text').innerText = data;
-                const match = data.match(/\((\d+)%\)/);
-                if (match) document.getElementById('progress-bar').style.width = match[1] + '%';
             } else if (type === 'success') {
                 handleGenerationSuccess(audioChunks, sampleRate, taskId);
             } else if (type === 'error') {
                 isProcessing = false;
-                processQueue();
+                document.getElementById('status-text').innerText = "GPU Memory Full - Refreshing...";
+                setTimeout(() => processQueue(), 2000);
             }
         };
 
@@ -329,7 +330,6 @@
                 return b;
             });
 
-            // Fast crossfade assembly
             const overlapSecs = 1.0; 
             const overlapSamples = Math.floor(overlapSecs * sampleRate);
             
