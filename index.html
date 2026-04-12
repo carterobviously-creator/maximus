@@ -1,0 +1,450 @@
+    <style>
+        /* ... existing styles ... */
+        
+        /* New Debug Log Styles */
+        .logs-panel {
+            margin-top: 2rem;
+            background: #000;
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            padding: 1rem;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.7rem;
+            max-height: 150px;
+            overflow-y: auto;
+            color: #0f0;
+            display: none;
+        }
+
+        .log-entry { margin-bottom: 0.2rem; }
+        .log-error { color: #ff4b4b; }
+        .log-info { color: var(--primary-neon); }
+
+        /* Protocol Warning Overlay */
+        #protocol-warning {
+            position: fixed;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background: rgba(10, 10, 15, 0.95);
+            z-index: 1000;
+            display: none;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            padding: 2rem;
+            text-align: center;
+            backdrop-filter: blur(10px);
+        }
+
+        .warning-card {
+            max-width: 500px;
+            background: var(--bg-card);
+            border: 1px solid var(--primary-neon);
+            padding: 2rem;
+            border-radius: 20px;
+            box-shadow: 0 0 30px var(--accent-glow);
+        }
+
+        .code-block {
+            background: #000;
+            padding: 1rem;
+            border-radius: 8px;
+            margin: 1rem 0;
+            font-family: 'JetBrains Mono', monospace;
+            color: var(--primary-neon);
+            text-align: left;
+            font-size: 0.8rem;
+        }
+    </style>
+</head>
+<body>
+    <div id="protocol-warning">
+        <div class="warning-card">
+            <h2 style="color: var(--primary-neon); margin-bottom: 1rem;">Protocol Restricted</h2>
+            <p style="margin-bottom: 1rem;">WebGPU is disabled on the <code>file://</code> protocol for security reasons.</p>
+            <p>To use this app, you must run it through a local server. Run this command in your project folder:</p>
+            <div class="code-block">npx http-server .</div>
+            <p>Then open the <code>http://localhost:8080</code> link in your browser.</p>
+        </div>
+    </div>
+
+    <header>
+        <div class="logo">Audio Studio v3</div>
+        <div class="gpu-status">
+            <div id="gpu-dot" class="status-dot"></div>
+            <span id="gpu-text">WEBGPU: DETECTING...</span>
+        </div>
+    </header>
+
+    <main>
+        <aside>
+            <div class="control-group">
+                <label>Audio Description</label>
+                <textarea id="prompt" placeholder="E.g., Lo-fi hip hop beat with smooth piano and rainy atmosphere..."></textarea>
+            </div>
+
+            <button id="generate-btn" class="btn-generate">Initialize Audio</button>
+
+            <div id="progress-section" class="progress-container">
+                <div class="control-group">
+                    <div class="progress-label">
+                        <span id="progress-status">Loading Model</span>
+                        <span id="progress-percent">0%</span>
+                    </div>
+                    <div class="progress-bar">
+                        <div id="progress-fill" class="progress-fill"></div>
+                    </div>
+                </div>
+            </div>
+
+            <div id="logs" class="logs-panel"></div>
+
+            <div class="control-group" style="margin-top: auto;">
+                <p style="font-size: 0.7rem; color: var(--text-dim); line-height: 1.4;">
+                    Device: <strong id="device-info" style="color: var(--secondary-neon)">Checking...</strong><br>
+                    Running <strong style="color: var(--primary-neon)">MusicGen-Small (fp16)</strong>
+                </p>
+            </div>
+        </aside>
+
+        <section class="content">
+            <div class="visualizer-card">
+                <canvas id="visualizer"></canvas>
+                <div style="position: absolute; bottom: 2rem; color: var(--text-dim); font-size: 0.8rem; pointer-events: none;" id="vis-placeholder">
+                    Generate audio to see frequencies
+                </div>
+            </div>
+
+            <div style="display: flex; justify-content: center; width: 100%;">
+                <div class="playback-controls">
+                    <button id="play-btn" class="play-btn" disabled>
+                        <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>
+                    </button>
+                    <div style="display: flex; flex-direction: column;">
+                        <span id="track-name" style="font-size: 0.9rem; font-weight: 600;">Untitled Clip</span>
+                        <span id="time-display" style="font-size: 0.7rem; color: var(--text-dim); font-family: 'JetBrains Mono'">00:00 / 00:00</span>
+                    </div>
+                    <button id="download-btn" class="download-btn" disabled>EXPORT WAV</button>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <script type="module">
+        // --- UI & State Management ---
+        const logsPanel = document.getElementById('logs');
+        const deviceInfo = document.getElementById('device-info');
+        const protocolWarning = document.getElementById('protocol-warning');
+
+        function log(msg, type = 'info') {
+            logsPanel.style.display = 'block';
+            const div = document.createElement('div');
+            div.className = `log-entry log-${type}`;
+            div.textContent = `[${new Date().toLocaleTimeString()}] ${msg}`;
+            logsPanel.appendChild(div);
+            logsPanel.scrollTop = logsPanel.scrollHeight;
+            console.log(msg);
+        }
+
+        // --- Hardware Check ---
+        async function checkWebGPU() {
+            if (window.location.protocol === 'file:') {
+                protocolWarning.style.display = 'flex';
+                log('WebGPU blocked by file:// protocol', 'error');
+                return false;
+            }
+
+            if (!navigator.gpu) {
+                gpuText.textContent = 'WEBGPU: NOT FOUND';
+                log('navigator.gpu not available. Use Chrome/Edge or enable flags.', 'error');
+                return false;
+            }
+
+            try {
+                const adapter = await navigator.gpu.requestAdapter();
+                if (adapter) {
+                    const device = await adapter.requestDevice();
+                    gpuDot.classList.add('active');
+                    gpuText.textContent = 'WEBGPU: ACTIVE';
+                    deviceInfo.textContent = adapter.name || 'WebGPU Device';
+                    log(`Adapter found: ${adapter.name}`);
+                    return true;
+                }
+            } catch (e) {
+                log(`WebGPU Error: ${e.message}`, 'error');
+            }
+            
+            gpuText.textContent = 'WEBGPU: FAIL';
+            return false;
+        }
+
+        checkWebGPU();
+
+        const promptInput = document.getElementById('prompt');
+        const generateBtn = document.getElementById('generate-btn');
+        const playBtn = document.getElementById('play-btn');
+        const downloadBtn = document.getElementById('download-btn');
+        const progressSection = document.getElementById('progress-section');
+        const progressFill = document.getElementById('progress-fill');
+        const progressStatus = document.getElementById('progress-status');
+        const progressPercent = document.getElementById('progress-percent');
+        const visualizerCanvas = document.getElementById('visualizer');
+        const timeDisplay = document.getElementById('time-display');
+
+        let isGenerating = false;
+        let isModelLoaded = false;
+        let generatedAudioBuffer = null;
+        let audioContext = null;
+        let audioSource = null;
+        let analyser = null;
+        let animationId = null;
+
+        // --- Web Worker Setup ---
+        const workerCode = `
+            import { pipeline, env } from 'https://cdn.jsdelivr.net/npm/@huggingface/transformers@3.0.0';
+
+            env.allowLocalModels = false;
+            
+            let musicPipeline = null;
+
+            self.onmessage = async (e) => {
+                const { type, data } = e.data;
+
+                if (type === 'load') {
+                    try {
+                        self.postMessage({ type: 'status', data: 'Loading AI Core (fp16)...' });
+                        
+                        musicPipeline = await pipeline('text-to-audio', 'onnx-community/musicgen-small', {
+                            device: 'webgpu',
+                            dtype: 'fp16', // Better performance for WebGPU
+                            progress_callback: (p) => {
+                                if (p.status === 'progress') {
+                                     self.postMessage({ type: 'progress', data: p.progress, file: p.file });
+                                }
+                            }
+                        });
+
+                        self.postMessage({ type: 'loaded' });
+                    } catch (err) {
+                        self.postMessage({ type: 'error', data: err.message });
+                    }
+                }
+
+                if (type === 'generate') {
+                    try {
+                        self.postMessage({ type: 'status', data: 'Generating waveform...' });
+                        
+                        const output = await musicPipeline(data.prompt, {
+                            max_new_tokens: 256,
+                            generate_kwargs: {
+                                do_sample: true,
+                            }
+                        });
+
+                        self.postMessage({ 
+                            type: 'result', 
+                            data: {
+                                audio: output.audio,
+                                sampling_rate: output.sampling_rate
+                            } 
+                        });
+                    } catch (err) {
+                        self.postMessage({ type: 'error', data: err.message });
+                    }
+                }
+            };
+        `;
+
+        const blob = new Blob([workerCode], { type: 'application/javascript' });
+        const worker = new Worker(URL.createObjectURL(blob), { type: 'module' });
+
+        worker.onmessage = (e) => {
+            const { type, data, file } = e.data;
+
+            if (type === 'status') {
+                progressStatus.textContent = data;
+                log(data);
+            }
+
+            if (type === 'progress') {
+                const percent = Math.round(data);
+                progressFill.style.width = `${percent}%`;
+                progressPercent.textContent = `${percent}%`;
+            }
+
+            if (type === 'loaded') {
+                isModelLoaded = true;
+                isGenerating = false;
+                generateBtn.textContent = 'GENERATE AUDIO';
+                generateBtn.disabled = false;
+                progressSection.style.display = 'none';
+                log('Model loaded and ready.', 'info');
+            }
+
+            if (type === 'result') {
+                log('Generation complete.', 'info');
+                handleGenerationResult(data);
+            }
+
+            if (type === 'error') {
+                log(`Critical Error: ${data}`, 'error');
+                resetUI();
+            }
+        };
+
+        generateBtn.onclick = () => {
+            if (!isModelLoaded) {
+                log('Initializing pipeline...');
+                isGenerating = true;
+                generateBtn.disabled = true;
+                generateBtn.textContent = 'INITIALIZING...';
+                progressSection.style.display = 'block';
+                worker.postMessage({ type: 'load' });
+            } else {
+                const prompt = promptInput.value.trim();
+                if (!prompt) {
+                    log('No prompt provided', 'error');
+                    return;
+                }
+                log(`Starting generation for: "${prompt}"`);
+                isGenerating = true;
+                generateBtn.disabled = true;
+                generateBtn.textContent = 'GENERATING...';
+                progressSection.style.display = 'block';
+                progressFill.style.width = '10%';
+                worker.postMessage({ type: 'generate', data: { prompt } });
+            }
+        };
+
+        function resetUI() {
+            isGenerating = false;
+            generateBtn.disabled = false;
+            generateBtn.textContent = isModelLoaded ? 'GENERATE AUDIO' : 'INITIALIZE AUDIO';
+            progressSection.style.display = 'none';
+        }
+
+        async function handleGenerationResult(result) {
+            const { audio, sampling_rate } = result;
+            if (!audioContext) audioContext = new (window.AudioContext || window.webkitAudioContext)();
+            const buffer = audioContext.createBuffer(1, audio.length, sampling_rate);
+            buffer.copyToChannel(audio, 0);
+            generatedAudioBuffer = buffer;
+            playBtn.disabled = false;
+            downloadBtn.disabled = false;
+            document.getElementById('vis-placeholder').style.display = 'none';
+            timeDisplay.textContent = `00:00 / ${formatTime(buffer.duration)}`;
+            resetUI();
+        }
+
+        playBtn.onclick = () => {
+            if (audioSource) stopPlayback();
+            else startPlayback();
+        };
+
+        function startPlayback() {
+            if (!generatedAudioBuffer) return;
+            if (!audioContext) audioContext = new (window.AudioContext || window.webkitAudioContext)();
+            audioContext.resume();
+            audioSource = audioContext.createBufferSource();
+            audioSource.buffer = generatedAudioBuffer;
+            analyser = audioContext.createAnalyser();
+            analyser.fftSize = 256;
+            audioSource.connect(analyser);
+            analyser.connect(audioContext.destination);
+            audioSource.onended = stopPlayback;
+            audioSource.start(0);
+            playBtn.innerHTML = '<svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor"><path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/></svg>';
+            startVisualizer();
+        }
+
+        function stopPlayback() {
+            if (audioSource) { audioSource.stop(); audioSource = null; }
+            playBtn.innerHTML = '<svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>';
+            cancelAnimationFrame(animationId);
+            drawStaticVisualizer();
+        }
+
+        function formatTime(seconds) {
+            const mins = Math.floor(seconds / 60);
+            const secs = Math.floor(seconds % 60);
+            return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+        }
+
+        const ctx = visualizerCanvas.getContext('2d');
+        function resizeCanvas() {
+            visualizerCanvas.width = visualizerCanvas.offsetWidth;
+            visualizerCanvas.height = visualizerCanvas.offsetHeight;
+            drawStaticVisualizer();
+        }
+        window.onresize = resizeCanvas;
+        resizeCanvas();
+
+        function drawStaticVisualizer() {
+            ctx.clearRect(0, 0, visualizerCanvas.width, visualizerCanvas.height);
+            ctx.fillStyle = 'rgba(255, 255, 255, 0.05)';
+            const barWidth = 4; const barGap = 6;
+            const barCount = Math.floor(visualizerCanvas.width / (barWidth + barGap));
+            for (let i = 0; i < barCount; i++) {
+                const x = i * (barWidth + barGap);
+                const h = 5 + Math.random() * 10;
+                ctx.fillRect(x, visualizerCanvas.height / 2 - h/2, barWidth, h);
+            }
+        }
+
+        function startVisualizer() {
+            const bufferLength = analyser.frequencyBinCount;
+            const dataArray = new Uint8Array(bufferLength);
+            function draw() {
+                animationId = requestAnimationFrame(draw);
+                analyser.getByteFrequencyData(dataArray);
+                ctx.clearRect(0, 0, visualizerCanvas.width, visualizerCanvas.height);
+                const barWidth = 4; const barGap = 6;
+                const barCount = Math.floor(visualizerCanvas.width / (barWidth + barGap));
+                for (let i = 0; i < barCount; i++) {
+                    const index = Math.floor((i / barCount) * bufferLength);
+                    const value = dataArray[index];
+                    const percent = value / 255;
+                    const h = percent * visualizerCanvas.height * 0.8 + 2;
+                    const x = i * (barWidth + barGap);
+                    const gradient = ctx.createLinearGradient(0, visualizerCanvas.height/2-h/2, 0, visualizerCanvas.height/2+h/2);
+                    gradient.addColorStop(0, '#00f2ff'); gradient.addColorStop(1, '#bc13fe');
+                    ctx.fillStyle = gradient;
+                    ctx.beginPath(); ctx.roundRect(x, visualizerCanvas.height/2-h/2, barWidth, h, 2); ctx.fill();
+                }
+            }
+            draw();
+        }
+
+        downloadBtn.onclick = () => {
+            if (!generatedAudioBuffer) return;
+            const wavData = audioBufferToWav(generatedAudioBuffer);
+            const blob = new Blob([wavData], { type: 'audio/wav' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `ai-audio-${Date.now()}.wav`;
+            a.click();
+        };
+
+        function audioBufferToWav(buffer) {
+            const numChannels = buffer.numberOfChannels;
+            const sampleRate = buffer.sampleRate;
+            const result = buffer.getChannelData(0);
+            const dataLength = result.length * 2;
+            const bufferData = new ArrayBuffer(44 + dataLength);
+            const view = new DataView(bufferData);
+            const writeS = (offset, s) => { for (let i = 0; i < s.length; i++) view.setUint8(offset + i, s.charCodeAt(i)); };
+            writeS(0, 'RIFF'); view.setUint32(4, 36 + dataLength, true); writeS(8, 'WAVE');
+            writeS(12, 'fmt '); view.setUint32(16, 16, true); view.setUint16(20, 1, true);
+            view.setUint16(22, numChannels, true); view.setUint32(24, sampleRate, true);
+            view.setUint32(28, sampleRate * 2, true); view.setUint16(32, numChannels * 2, true);
+            view.setUint16(34, 16, true); writeS(36, 'data'); view.setUint32(40, dataLength, true);
+            let offset = 44;
+            for (let i = 0; i < result.length; i++, offset += 2) {
+                const s = Math.max(-1, Math.min(1, result[i]));
+                view.setInt16(offset, s < 0 ? s * 0x8000 : s * 0x7FFF, true);
+            }
+            return bufferData;
+        }
+    </script>
+</body>
+</html>
