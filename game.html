@@ -1,0 +1,252 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Angry Birds Clone - Epic Edition</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/matter-js/0.19.0/matter.min.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Arial', sans-serif;
+            background: linear-gradient(to bottom, #87CEEB 0%, #E0F6FF 100%);
+            overflow: hidden;
+            position: relative;
+        }
+
+        #game-container {
+            position: relative;
+            width: 100vw;
+            height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        #game-canvas {
+            border: 3px solid #8B4513;
+            background: linear-gradient(to bottom, #87CEEB 0%, #C2E0FF 50%, #90EE90 100%);
+            box-shadow: 0 10px 40px rgba(0,0,0,0.3);
+            cursor: crosshair;
+        }
+
+        #hud {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            background: rgba(255,255,255,0.9);
+            padding: 15px 25px;
+            border-radius: 15px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+            font-size: 18px;
+            font-weight: bold;
+            color: #333;
+            z-index: 10;
+        }
+
+        #score {
+            color: #FF4500;
+            font-size: 24px;
+        }
+
+        #birds-left {
+            color: #4169E1;
+            margin-top: 5px;
+        }
+
+        #instructions {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            background: rgba(255,255,255,0.9);
+            padding: 15px;
+            border-radius: 15px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+            max-width: 250px;
+            font-size: 14px;
+            z-index: 10;
+        }
+
+        #instructions h3 {
+            color: #FF4500;
+            margin-bottom: 10px;
+        }
+
+        #instructions ul {
+            margin-left: 20px;
+        }
+
+        #instructions li {
+            margin: 5px 0;
+        }
+
+        #game-over-screen,
+        #win-screen {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: rgba(0,0,0,0.95);
+            padding: 40px;
+            border-radius: 20px;
+            text-align: center;
+            display: none;
+            z-index: 100;
+            box-shadow: 0 0 50px rgba(255,255,255,0.3);
+        }
+
+        #game-over-screen h1,
+        #win-screen h1 {
+            color: #FF4500;
+            font-size: 48px;
+            margin-bottom: 20px;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.5);
+        }
+
+        #game-over-screen p,
+        #win-screen p {
+            color: white;
+            font-size: 24px;
+            margin: 10px 0;
+        }
+
+        .restart-btn {
+            margin-top: 20px;
+            padding: 15px 40px;
+            font-size: 20px;
+            background: #FF4500;
+            color: white;
+            border: none;
+            border-radius: 10px;
+            cursor: pointer;
+            transition: all 0.3s;
+            font-weight: bold;
+        }
+
+        .restart-btn:hover {
+            background: #FF6347;
+            transform: scale(1.1);
+        }
+
+        #youtube-player {
+            position: absolute;
+            bottom: 20px;
+            right: 20px;
+            width: 300px;
+            height: 170px;
+            z-index: 10;
+            border-radius: 10px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.3);
+        }
+
+        #easter-egg-btn {
+            position: absolute;
+            bottom: 20px;
+            left: 20px;
+            padding: 10px 20px;
+            background: linear-gradient(45deg, #FF1493, #FF69B4);
+            color: white;
+            border: none;
+            border-radius: 10px;
+            cursor: pointer;
+            font-weight: bold;
+            font-size: 14px;
+            box-shadow: 0 4px 10px rgba(255,20,147,0.4);
+            transition: all 0.3s;
+            z-index: 10;
+            animation: rainbow 3s infinite;
+        }
+
+        #easter-egg-btn:hover {
+            transform: scale(1.1) rotate(5deg);
+        }
+
+        @keyframes rainbow {
+            0% { background: linear-gradient(45deg, #FF1493, #FF69B4); }
+            25% { background: linear-gradient(45deg, #00CED1, #40E0D0); }
+            50% { background: linear-gradient(45deg, #FFD700, #FFA500); }
+            75% { background: linear-gradient(45deg, #9370DB, #BA55D3); }
+            100% { background: linear-gradient(45deg, #FF1493, #FF69B4); }
+        }
+
+        .retro-mode {
+            filter: contrast(150%) brightness(90%) hue-rotate(20deg);
+            animation: glitch 0.3s infinite;
+        }
+
+        @keyframes glitch {
+            0% { transform: translate(0); }
+            20% { transform: translate(-2px, 2px); }
+            40% { transform: translate(-2px, -2px); }
+            60% { transform: translate(2px, 2px); }
+            80% { transform: translate(2px, -2px); }
+            100% { transform: translate(0); }
+        }
+
+        .particle {
+            position: absolute;
+            pointer-events: none;
+            animation: float 1s ease-out forwards;
+        }
+
+        @keyframes float {
+            to {
+                transform: translateY(-100px) scale(0);
+                opacity: 0;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div id="game-container">
+        <canvas id="game-canvas"></canvas>
+        
+        <div id="hud">
+            <div>Score: <span id="score">0</span></div>
+            <div id="birds-left">Birds: <span id="bird-count">3</span></div>
+        </div>
+
+        <div id="instructions">
+            <h3>🎮 How to Play</h3>
+            <ul>
+                <li>Click and drag bird</li>
+                <li>Release to launch</li>
+                <li>Destroy all pigs!</li>
+                <li>Press R to reset</li>
+                <li>Press SPACE for surprise!</li>
+            </ul>
+        </div>
+
+        <div id="game-over-screen">
+            <h1>Game Over!</h1>
+            <p>Final Score: <span id="final-score">0</span></p>
+            <button class="restart-btn" onclick="location.reload()">Play Again</button>
+        </div>
+
+        <div id="win-screen">
+            <h1>Victory! 🎉</h1>
+            <p>You defeated all the pigs!</p>
+            <p>Final Score: <span id="win-score">0</span></p>
+            <button class="restart-btn" onclick="location.reload()">Play Again</button>
+        </div>
+
+        <iframe id="youtube-player"
+                src="https://www.youtube.com/embed/wLfEMVZsZYg?autoplay=1&loop=1&playlist=wLfEMVZsZYg&controls=1"
+                frameborder="0"
+                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                allowfullscreen>
+        </iframe>
+
+        <button id="easter-egg-btn" onclick="toggleRetroMode()">
+            🌈 Random Thing™
+        </button>
+    </div>
+
+    <script src="game.js"></script>
+</body>
+</html>
