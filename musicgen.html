@@ -1,0 +1,310 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>MusicGen — AI Music Generator</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet" />
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: {
+            mono: ['"JetBrains Mono"', 'monospace'],
+          },
+          colors: {
+            cyan: {
+              400: '#22d3ee',
+              500: '#06b6d4',
+            },
+            orange: {
+              400: '#fb923c',
+              500: '#f97316',
+            },
+          },
+          boxShadow: {
+            'cyan-glow': '0 0 12px 2px rgba(34,211,238,0.45)',
+            'orange-glow': '0 0 12px 2px rgba(251,146,60,0.45)',
+          },
+        },
+      },
+    };
+  </script>
+  <style>
+    body {
+      font-family: 'JetBrains Mono', monospace;
+      background-color: #0a0a0f;
+      color: #e2e8f0;
+    }
+
+    ::-webkit-scrollbar {
+      width: 6px;
+    }
+    ::-webkit-scrollbar-track {
+      background: #0a0a0f;
+    }
+    ::-webkit-scrollbar-thumb {
+      background: #22d3ee44;
+      border-radius: 3px;
+    }
+
+    .glow-cyan {
+      text-shadow: 0 0 8px rgba(34, 211, 238, 0.7);
+    }
+    .glow-orange {
+      text-shadow: 0 0 8px rgba(251, 146, 60, 0.7);
+    }
+    .border-glow-cyan {
+      box-shadow: 0 0 0 1px rgba(34, 211, 238, 0.3), inset 0 0 20px rgba(34, 211, 238, 0.05);
+    }
+    .border-glow-cyan:focus {
+      box-shadow: 0 0 0 2px rgba(34, 211, 238, 0.6), inset 0 0 20px rgba(34, 211, 238, 0.08);
+    }
+
+    .btn-generate {
+      position: relative;
+      overflow: hidden;
+      transition: box-shadow 0.2s ease, transform 0.1s ease;
+    }
+    .btn-generate:not(:disabled):hover {
+      box-shadow: 0 0 18px 4px rgba(34, 211, 238, 0.5);
+      transform: translateY(-1px);
+    }
+    .btn-generate:not(:disabled):active {
+      transform: translateY(0);
+    }
+
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+    .spinner {
+      display: inline-block;
+      width: 18px;
+      height: 18px;
+      border: 2px solid rgba(255, 255, 255, 0.25);
+      border-top-color: #fff;
+      border-radius: 50%;
+      animation: spin 0.7s linear infinite;
+    }
+
+    @keyframes pulse-border {
+      0%, 100% { box-shadow: 0 0 0 1px rgba(34, 211, 238, 0.3); }
+      50%       { box-shadow: 0 0 0 2px rgba(34, 211, 238, 0.6); }
+    }
+    .audio-player-wrapper {
+      animation: pulse-border 2s ease-in-out infinite;
+      border-radius: 0.5rem;
+    }
+
+    audio {
+      width: 100%;
+      filter: invert(1) hue-rotate(180deg);
+    }
+    audio::-webkit-media-controls-panel {
+      background-color: #111827;
+    }
+
+    .tag {
+      font-size: 0.65rem;
+      padding: 1px 6px;
+      border-radius: 3px;
+      border: 1px solid;
+      vertical-align: middle;
+    }
+  </style>
+</head>
+<body class="min-h-screen flex flex-col items-center justify-start py-10 px-4">
+
+  <!-- Header -->
+  <header class="w-full max-w-2xl mb-8 text-center">
+    <div class="flex items-center justify-center gap-3 mb-2">
+      <span class="text-orange-400 text-2xl">♬</span>
+      <h1 class="text-3xl font-bold tracking-tight glow-cyan text-cyan-400">MusicGen</h1>
+      <span class="tag text-orange-400 border-orange-400/50">AI</span>
+    </div>
+    <p class="text-slate-400 text-sm">
+      Generate music from text prompts via
+      <span class="text-cyan-400">facebook/musicgen-small</span>
+    </p>
+  </header>
+
+  <!-- Main Card -->
+  <main class="w-full max-w-2xl bg-[#0f0f1a] border border-cyan-400/20 rounded-xl p-6 shadow-lg space-y-6">
+
+    <!-- Prompt Section -->
+    <section>
+      <label for="prompt" class="block text-xs font-medium text-cyan-400 uppercase tracking-widest mb-2">
+        &gt; Music Prompt
+      </label>
+      <textarea
+        id="prompt"
+        rows="4"
+        placeholder="Dark synthwave with heavy drums and pulsing bass lines…"
+        class="w-full bg-[#080810] text-slate-200 placeholder-slate-600 rounded-lg px-4 py-3 text-sm leading-relaxed resize-none outline-none border border-cyan-400/20 border-glow-cyan focus:border-cyan-400/50 transition-all duration-200"
+      ></textarea>
+    </section>
+
+    <!-- Token Section -->
+    <section>
+      <label for="token" class="block text-xs font-medium text-orange-400 uppercase tracking-widest mb-2">
+        &gt; HuggingFace API Token
+      </label>
+      <input
+        id="token"
+        type="password"
+        placeholder="hf_••••••••••••••••"
+        class="w-full bg-[#080810] text-slate-200 placeholder-slate-600 rounded-lg px-4 py-3 text-sm outline-none border border-orange-400/20 focus:border-orange-400/50 transition-all duration-200"
+        style="box-shadow: 0 0 0 1px rgba(251,146,60,0.2);"
+      />
+      <p class="text-xs text-slate-500 mt-1.5">
+        Get a free token at
+        <a href="https://huggingface.co/settings/tokens" target="_blank" rel="noopener" class="text-cyan-400 hover:underline">
+          huggingface.co/settings/tokens
+        </a>
+      </p>
+    </section>
+
+    <!-- Generate Button -->
+    <section>
+      <button
+        id="generateBtn"
+        class="btn-generate w-full bg-cyan-500 hover:bg-cyan-400 disabled:bg-slate-700 disabled:cursor-not-allowed text-black disabled:text-slate-400 font-bold py-3 px-6 rounded-lg text-sm uppercase tracking-widest transition-colors duration-200"
+      >
+        <span id="btnLabel">Generate Music</span>
+        <span id="btnSpinner" class="hidden ml-2 spinner"></span>
+      </button>
+    </section>
+
+    <!-- Status / Error -->
+    <section id="statusSection" class="hidden">
+      <p id="statusMsg" class="text-sm text-center"></p>
+    </section>
+
+    <!-- Audio Player -->
+    <section id="audioSection" class="hidden">
+      <label class="block text-xs font-medium text-cyan-400 uppercase tracking-widest mb-2">
+        &gt; Generated Audio
+      </label>
+      <div class="audio-player-wrapper p-3 bg-[#080810] border border-cyan-400/20 rounded-lg">
+        <audio id="audioPlayer" controls></audio>
+      </div>
+      <div class="flex justify-between items-center mt-2">
+        <a
+          id="downloadLink"
+          href="#"
+          download="musicgen-output.wav"
+          class="text-xs text-orange-400 hover:text-orange-300 transition-colors glow-orange"
+        >
+          ↓ Download WAV
+        </a>
+        <span id="generatedAt" class="text-xs text-slate-500"></span>
+      </div>
+    </section>
+
+  </main>
+
+  <!-- Footer -->
+  <footer class="mt-8 text-xs text-slate-600 text-center space-y-1">
+    <p>Powered by <span class="text-cyan-400/70">Hugging Face Inference API</span> · Model: <span class="text-orange-400/70">facebook/musicgen-small</span></p>
+    <p>Generation may take 20–60 seconds on a cold start.</p>
+  </footer>
+
+  <script>
+    const HF_API_URL = 'https://router.huggingface.co/hf-inference/models/facebook/musicgen-small';
+
+    const generateBtn   = document.getElementById('generateBtn');
+    const btnLabel      = document.getElementById('btnLabel');
+    const btnSpinner    = document.getElementById('btnSpinner');
+    const promptEl      = document.getElementById('prompt');
+    const tokenEl       = document.getElementById('token');
+    const statusSection = document.getElementById('statusSection');
+    const statusMsg     = document.getElementById('statusMsg');
+    const audioSection  = document.getElementById('audioSection');
+    const audioPlayer   = document.getElementById('audioPlayer');
+    const downloadLink  = document.getElementById('downloadLink');
+    const generatedAt   = document.getElementById('generatedAt');
+
+    function setLoading(loading) {
+      generateBtn.disabled = loading;
+      btnLabel.textContent = loading ? 'Generating…' : 'Generate Music';
+      btnSpinner.classList.toggle('hidden', !loading);
+    }
+
+    function showStatus(message, isError = false) {
+      statusSection.classList.remove('hidden');
+      statusMsg.textContent = message;
+      statusMsg.className = isError ? 'text-sm text-center text-red-400' : 'text-sm text-center text-cyan-400';
+    }
+
+    function hideStatus() {
+      statusSection.classList.add('hidden');
+    }
+
+    generateBtn.addEventListener('click', async () => {
+      const prompt = promptEl.value.trim();
+      const token  = tokenEl.value.trim();
+
+      if (!prompt) {
+        showStatus('⚠ Please enter a music prompt.', true);
+        promptEl.focus();
+        return;
+      }
+      if (!token) {
+        showStatus('⚠ Please enter your Hugging Face API token.', true);
+        tokenEl.focus();
+        return;
+      }
+
+      hideStatus();
+      audioSection.classList.add('hidden');
+      setLoading(true);
+      showStatus('⏳ Sending request to Hugging Face… this may take up to 60 seconds.');
+
+      try {
+        const response = await fetch(HF_API_URL, {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ inputs: prompt }),
+        });
+
+        if (!response.ok) {
+          let errText = `HTTP ${response.status}`;
+          try {
+            const errJson = await response.json();
+            errText = errJson.error || errJson.message || errText;
+          } catch (_) { /* response body is not JSON — use the HTTP status text instead */ }
+          throw new Error(errText);
+        }
+
+        const blob = await response.blob();
+        const url  = URL.createObjectURL(blob);
+
+        audioPlayer.src   = url;
+        downloadLink.href = url;
+        generatedAt.textContent = `Generated at ${new Date().toLocaleTimeString()}`;
+
+        audioSection.classList.remove('hidden');
+        hideStatus();
+        audioPlayer.play().catch(() => { /* autoplay may be blocked by the browser; user can press play manually */ });
+      } catch (err) {
+        showStatus(`✗ Error: ${err.message}`, true);
+      } finally {
+        setLoading(false);
+      }
+    });
+
+    // Allow Ctrl+Enter to trigger generation
+    promptEl.addEventListener('keydown', (e) => {
+      if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
+        generateBtn.click();
+      }
+    });
+  </script>
+</body>
+</html>
